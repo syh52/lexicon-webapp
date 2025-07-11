@@ -7,7 +7,7 @@ cloud.init({
 const db = cloud.database();
 
 exports.main = async (event, context) => {
-  const { action, userId, userInfo } = event;
+  const { action, userId, userInfo, email, displayName } = event;
   const { userRecord } = context;
   
   // 如果没有传userId，使用当前登录用户的uid
@@ -24,6 +24,14 @@ exports.main = async (event, context) => {
     switch (action) {
       case 'get':
         return await getUserInfo(currentUserId);
+      
+      case 'getOrCreate':
+        // 获取或创建用户信息（用于登录时）
+        return await getOrCreateUserInfo(currentUserId, { email, displayName });
+      
+      case 'init':
+        // 初始化用户信息（用于注册时）
+        return await createUserInfo(currentUserId, { email, displayName });
       
       case 'update':
         return await updateUserInfo(currentUserId, userInfo);
@@ -115,8 +123,8 @@ async function createUserInfo(userId, userInfo = {}) {
     // 创建新用户信息
     const userData = {
       uid: userId,
-      displayName: userInfo.displayName || '新用户',
-      avatar: userInfo.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+      displayName: userInfo.displayName || userInfo.email?.split('@')[0] || '新用户',
+      avatar: userInfo.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userInfo.email || userId}`,
       level: 1,
       totalWords: 0,
       studiedWords: 0,
@@ -150,6 +158,45 @@ async function createUserInfo(userId, userInfo = {}) {
     return {
       success: false,
       error: '创建用户信息失败：' + error.message
+    };
+  }
+}
+
+// 获取或创建用户信息
+async function getOrCreateUserInfo(userId, userInfo = {}) {
+  try {
+    // 先尝试获取用户信息
+    const userResult = await db.collection('users')
+      .where({ uid: userId })
+      .get();
+
+    if (userResult.data.length > 0) {
+      // 用户存在，返回用户信息
+      const user = userResult.data[0];
+      return {
+        success: true,
+        data: {
+          uid: user.uid,
+          displayName: user.displayName,
+          avatar: user.avatar,
+          level: user.level,
+          totalWords: user.totalWords,
+          studiedWords: user.studiedWords,
+          correctRate: user.correctRate,
+          streakDays: user.streakDays,
+          lastStudyDate: user.lastStudyDate,
+          isNewUser: false
+        }
+      };
+    } else {
+      // 用户不存在，创建新用户
+      return await createUserInfo(userId, userInfo);
+    }
+  } catch (error) {
+    console.error('获取或创建用户信息失败:', error);
+    return {
+      success: false,
+      error: '获取或创建用户信息失败：' + error.message
     };
   }
 }

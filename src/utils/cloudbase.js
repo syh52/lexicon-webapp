@@ -10,12 +10,16 @@ const isValidEnvId = ENV_ID && ENV_ID !== 'your-env-id';
  * 初始化云开发实例
  * @param {Object} config - 初始化配置
  * @param {string} config.env - 环境ID，默认使用ENV_ID
+ * @param {string} config.region - 地域，默认ap-shanghai
+ * @param {string} config.clientId - 客户端ID
  * @param {number} config.timeout - 超时时间，默认15000ms
  * @returns {Object} 云开发实例
  */
 export const init = (config = {}) => {
   const appConfig = {
     env: config.env || ENV_ID,
+    region: config.region || 'ap-shanghai',
+    clientId: config.clientId || 'lexicon-webapp-client',
     timeout: config.timeout || 15000,
   };
 
