@@ -80,42 +80,64 @@ npm run start
 
 ## 部署指南
 
-### 部署到云开发云托管
+### 快速部署到静态网站托管
 
-项目已配置云托管支持，可通过以下方式部署：
+项目已成功配置静态网站托管部署，支持以下方式：
 
-#### 方式一：使用 CloudBase CLI 自动部署
+#### 方式一：使用快速部署脚本（推荐）
+
+**Linux/macOS:**
 ```bash
-# 安装 CloudBase CLI
-npm install -g @cloudbase/cli
+./deploy.sh
+```
 
-# 登录云开发
-cloudbase login
+**Windows:**
+```batch
+deploy.bat
+```
 
-# 部署到云托管
+#### 方式二：手动部署命令
+```bash
+# 1. 构建项目
+npm run build
+
+# 2. 部署到静态网站托管
+cloudbase hosting deploy dist -e cloud1-7g7oatv381500c81
+```
+
+#### 方式三：部署到云托管（需要按量付费环境）
+```bash
+# 前提：需要在控制台切换到按量付费模式
 cloudbase framework deploy
 ```
 
-#### 方式二：手动构建Docker镜像
+### 部署要求
+- ✅ 已安装 Node.js 18+ (当前: v22.17.0)
+- ✅ 已安装 CloudBase CLI 2.7.7+
+- ✅ 已登录 CloudBase 平台
+- ✅ 静态网站托管已开启（免费）
+- ✅ 网络代理已配置（如需要）
+- ⚠️ 云托管需要按量付费环境
+
+### 网络配置（可选）
+如果网络访问受限，请设置代理：
 ```bash
-# 构建Docker镜像
-docker build -t lexicon-app .
+# Linux/macOS
+export HTTP_PROXY=http://127.0.0.1:7890
+export HTTPS_PROXY=http://127.0.0.1:7890
 
-# 本地测试
-docker run -p 3000:3000 lexicon-app
+# Windows PowerShell
+$env:HTTP_PROXY="http://127.0.0.1:7890"
+$env:HTTPS_PROXY="http://127.0.0.1:7890"
 ```
-
-#### 云托管配置说明
-- **服务名称**: lexicon-app
-- **访问路径**: /lexicon
-- **容器端口**: 3000
-- **自动构建**: 支持从代码仓库自动构建和部署
 
 ### 🚀 在线体验
 
-项目已部署到云开发云托管，可直接访问体验：
+项目已成功部署到云开发静态网站托管，可直接访问体验：
 
-**[在线体验地址](https://lexicon-app-xxxx.app.tcloudbase.com/lexicon)** (部署后自动生成)
+**[在线体验地址](https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com)** 
+
+> 注意：由于 CDN 缓存，新部署的内容可能需要几分钟才能生效。
 
 ### 认证系统功能
 

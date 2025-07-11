@@ -15,7 +15,7 @@ export default defineConfig({
     host: '127.0.0.1',  // 使用IP地址代替localhost
     proxy: {
       '/__auth': {
-        target: 'https://envId-appid.tcloudbaseapp.com/',
+        target: 'https://cloud1-7g7oatv381500c81.tcloudbaseapp.com/',
         changeOrigin: true,
       }
     }
