@@ -117,6 +117,10 @@ async function handleRegister(email, password, displayName) {
           email: userData.email,
           displayName: userData.displayName,
           level: userData.level,
+          totalWords: userData.totalWords,
+          studiedWords: userData.studiedWords,
+          correctRate: userData.correctRate,
+          streakDays: userData.streakDays,
           message: '注册成功'
         }
       };
@@ -189,6 +193,7 @@ async function handleLogin(email, password) {
         studiedWords: user.studiedWords,
         correctRate: user.correctRate,
         streakDays: user.streakDays,
+        lastStudyDate: user.lastStudyDate,
         message: '登录成功'
       }
     };

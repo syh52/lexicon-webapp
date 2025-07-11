@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { User, Zap, BookOpen, Award, TrendingUp, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Zap, BookOpen, Award, TrendingUp, Mail, Lock, ArrowRight } from 'lucide-react';
 
 type AuthMode = 'login' | 'register';
 
@@ -42,19 +42,6 @@ export default function AuthPage() {
     return <Navigate to="/" replace />;
   }
 
-  const handleAnonymousLogin = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      await login();
-      navigate('/');
-    } catch (error: any) {
-      setError('登录失败，请重试');
-      console.error('登录失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,32 +289,12 @@ export default function AuthPage() {
                 </Button>
               </form>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-gray-600/50" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-gray-900/80 px-3 text-gray-500">或者</span>
-                </div>
-              </div>
-
-              {/* 匿名登录按钮 */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-gray-600/50 text-gray-300 hover:bg-gray-800/50 hover:border-gray-500 h-14 transition-all duration-200"
-                onClick={handleAnonymousLogin}
-                disabled={loading || authLoading}
-              >
-                <User className="w-4 h-4 mr-2" />
-                游客模式快速体验
-              </Button>
 
               {/* 功能特性 */}
               <div className="space-y-3 text-xs text-gray-500 border-t border-gray-700/50 pt-4">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>支持邮箱登录和游客模式</span>
+                  <span>支持邮箱注册和登录</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>

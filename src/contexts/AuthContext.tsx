@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { app, ensureLogin } from '../utils/cloudbase';
+import { app } from '../utils/cloudbase';
 
 interface User {
   id: string;
@@ -12,14 +12,13 @@ interface User {
   streakDays: number;
   lastStudyDate: string | null;
   isNewUser?: boolean;
-  email?: string;
-  loginType?: 'anonymous' | 'email';
+  email: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email?: string, password?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserInfo: (userInfo: Partial<User>) => Promise<void>;
@@ -46,45 +45,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    // 初始化时检查登录状态
+    // 初始化时检查本地存储的用户信息
     checkLoginStatus();
   }, []);
 
   const checkLoginStatus = async () => {
     try {
-      // 直接使用CloudBase auth API检查登录状态
-      const auth = app.auth();
-      let loginState = await auth.getLoginState();
+      // 检查本地存储中的用户信息
+      const storedUser = localStorage.getItem('lexicon_user');
+      const storedToken = localStorage.getItem('lexicon_token');
       
-      console.log('CloudBase登录状态:', loginState, typeof loginState);
-      
-      // 处理CloudBase返回值的不同格式
-      const isLoggedIn = loginState === true || 
-                        (loginState && loginState.isLoggedIn === true) ||
-                        (typeof loginState === 'object' && loginState.user);
-      
-      if (!isLoggedIn) {
-        // 如果未登录，执行匿名登录
-        console.log('执行匿名登录...');
-        await auth.signInAnonymously();
-        loginState = await auth.getLoginState();
-        console.log('匿名登录后状态:', loginState, typeof loginState);
-      }
-      
-      // 再次检查登录状态
-      const finalLoggedIn = loginState === true || 
-                           (loginState && loginState.isLoggedIn === true) ||
-                           (typeof loginState === 'object' && loginState.user);
-      
-      if (finalLoggedIn) {
-        // 用户已登录CloudBase，设置登录状态
-        setIsLoggedIn(true);
-        console.log('用户登录状态确认：已登录');
-        // 尝试获取用户信息
-        await loadUserInfo();
+      if (storedUser && storedToken) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          setIsLoggedIn(true);
+          console.log('用户已登录，从本地存储恢复状态');
+        } catch (error) {
+          console.error('解析本地用户信息失败:', error);
+          // 清除无效的本地存储
+          localStorage.removeItem('lexicon_user');
+          localStorage.removeItem('lexicon_token');
+          setIsLoggedIn(false);
+        }
       } else {
+        console.log('用户未登录');
         setIsLoggedIn(false);
-        console.log('用户登录状态确认：未登录');
       }
     } catch (error) {
       console.error('检查登录状态失败:', error);
@@ -94,82 +80,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const loadUserInfo = async () => {
+
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
     try {
+      // 先进行 CloudBase 匿名登录以获得调用云函数的权限
+      const auth = app.auth();
+      await auth.signInAnonymously();
+      
+      // 然后进行邮箱登录验证
       const result = await app.callFunction({
-        name: 'userInfo',
+        name: 'auth-new',
         data: {
-          action: 'get'
+          action: 'login',
+          email,
+          password
         }
       });
 
-      if (result.result?.success) {
-        const userData = result.result.data;
-        setUser({
-          id: userData.uid,
-          displayName: userData.displayName,
-          avatar: userData.avatar,
-          level: userData.level,
-          totalWords: userData.totalWords,
-          studiedWords: userData.studiedWords,
-          correctRate: userData.correctRate,
-          streakDays: userData.streakDays,
-          lastStudyDate: userData.lastStudyDate,
-          isNewUser: userData.isNewUser,
-          email: userData.email
-        });
-      } else {
-        // 用户信息获取失败，但登录状态仍然有效
-        console.warn('用户信息获取失败，但保持登录状态');
+      if (!result.result?.success) {
+        throw new Error(result.result?.error || '登录失败');
       }
-    } catch (error) {
-      console.error('获取用户信息失败:', error);
-      // 不要因为用户信息获取失败就重置登录状态
-    }
-  };
 
-  const login = async (email?: string, password?: string) => {
-    setIsLoading(true);
-    try {
-      if (email && password) {
-        // 邮箱登录
-        const result = await app.callFunction({
-          name: 'auth-new',
-          data: {
-            action: 'login',
-            email,
-            password
-          }
-        });
+      // 登录成功，设置用户信息
+      const userData = result.result.data;
+      const user: User = {
+        id: userData.userId,
+        displayName: userData.displayName,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.email}`,
+        level: userData.level || 1,
+        totalWords: userData.totalWords || 0,
+        studiedWords: userData.studiedWords || 0,
+        correctRate: userData.correctRate || 0,
+        streakDays: userData.streakDays || 0,
+        lastStudyDate: userData.lastStudyDate || null,
+        email: userData.email
+      };
 
-        if (!result.result?.success) {
-          throw new Error(result.result?.error || '登录失败');
-        }
+      // 保存到本地存储
+      localStorage.setItem('lexicon_user', JSON.stringify(user));
+      localStorage.setItem('lexicon_token', userData.userId);
 
-        // 邮箱登录成功后执行匿名登录以获取CloudBase身份
-        const auth = app.auth();
-        await auth.signInAnonymously();
-        
-        // 设置登录状态
-        setIsLoggedIn(true);
-        
-        // 加载用户信息
-        await loadUserInfo();
-      } else {
-        // 匿名登录
-        const auth = app.auth();
-        await auth.signInAnonymously();
-        
-        // 获取登录状态
-        const loginState = await auth.getLoginState();
-        
-        if (loginState && loginState.isLoggedIn) {
-          // 设置登录状态
-          setIsLoggedIn(true);
-          // 加载用户信息
-          await loadUserInfo();
-        }
-      }
+      // 设置状态
+      setUser(user);
+      setIsLoggedIn(true);
+
+      console.log('登录成功:', userData.message);
     } catch (error) {
       console.error('登录失败:', error);
       throw error;
@@ -181,6 +137,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (email: string, password: string) => {
     setIsLoading(true);
     try {
+      // 先进行 CloudBase 匿名登录以获得调用云函数的权限
+      const auth = app.auth();
+      await auth.signInAnonymously();
+      
+      // 然后进行邮箱注册
       const result = await app.callFunction({
         name: 'auth-new',
         data: {
@@ -205,13 +166,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      const auth = app.auth();
-      await auth.signOut();
+      // 清除本地存储
+      localStorage.removeItem('lexicon_user');
+      localStorage.removeItem('lexicon_token');
+      
+      // 清除状态
       setUser(null);
       setIsLoggedIn(false);
+      
+      console.log('登出成功');
     } catch (error) {
       console.error('登出失败:', error);
-      // 即使CloudBase登出失败，也清除本地用户状态
+      // 即使出错，也要清除本地状态
       setUser(null);
       setIsLoggedIn(false);
     }
@@ -219,27 +185,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updateUserInfo = async (userInfo: Partial<User>) => {
     try {
+      if (!user) {
+        throw new Error('用户未登录');
+      }
+
+      // 先确保 CloudBase 匿名登录
+      const auth = app.auth();
+      const loginState = await auth.getLoginState();
+      if (!loginState || !loginState.isLoggedIn) {
+        await auth.signInAnonymously();
+      }
+      
+      // 使用 auth-new 云函数更新用户信息
       const result = await app.callFunction({
-        name: 'userInfo',
+        name: 'auth-new',
         data: {
-          action: 'update',
+          action: 'updateUserInfo',
+          userId: user.id,
           userInfo: userInfo
         }
       });
 
       if (result.result?.success) {
-        const userData = result.result.data;
-        setUser({
-          id: userData.uid,
-          displayName: userData.displayName,
-          avatar: userData.avatar,
-          level: userData.level,
-          totalWords: userData.totalWords,
-          studiedWords: userData.studiedWords,
-          correctRate: userData.correctRate,
-          streakDays: userData.streakDays,
-          lastStudyDate: userData.lastStudyDate
-        });
+        // 更新本地用户信息
+        const updatedUser = { ...user, ...userInfo };
+        setUser(updatedUser);
+        
+        // 更新本地存储
+        localStorage.setItem('lexicon_user', JSON.stringify(updatedUser));
+        
+        console.log('用户信息更新成功');
       } else {
         throw new Error(result.result?.error || '更新用户信息失败');
       }
