@@ -19,8 +19,10 @@ RUN npm run build
 # 生产环境
 FROM node:18-alpine
 
-# 安装serve用于静态文件服务
-RUN npm install -g serve
+# 安装必要的工具和依赖
+RUN apk add --no-cache \
+    curl \
+    && npm install -g serve
 
 # 设置工作目录
 WORKDIR /app
@@ -32,8 +34,11 @@ COPY --from=builder /app/dist ./dist
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# 创建健康检查脚本
-RUN echo '#!/bin/sh\nwget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1' > /healthcheck.sh && chmod +x /healthcheck.sh
+# 创建健康检查脚本 (使用curl替代wget)
+RUN echo '#!/bin/sh\ncurl -f http://localhost:3000/ || exit 1' > /healthcheck.sh && chmod +x /healthcheck.sh
+
+# 添加健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 CMD ["/healthcheck.sh"]
 
 # 暴露端口
 EXPOSE 3000
