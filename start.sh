@@ -20,14 +20,16 @@ if [ ! "$(ls -A dist)" ]; then
 fi
 
 echo "✅ dist directory found and contains files"
+echo "📋 Directory contents:"
+ls -la dist/
 
 # 等待几秒确保服务完全启动
 echo "⏳ Waiting for system to initialize..."
-sleep 3
+sleep 2
 
 # 启动静态文件服务
-echo "🌐 Starting static file server on port 3000..."
+echo "🌐 Starting static file server on 0.0.0.0:3000..."
 echo "📍 Serving files from: $(pwd)/dist"
 
-# 启动服务，添加详细日志
-exec serve -s dist -l 3000 --no-clipboard -v
+# 启动服务，监听所有接口
+exec serve -s dist -l 0.0.0.0:3000 --no-clipboard
