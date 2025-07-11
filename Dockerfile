@@ -28,8 +28,20 @@ WORKDIR /app
 # 从构建阶段复制构建产物
 COPY --from=builder /app/dist ./dist
 
+# 复制启动脚本
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+# 添加健康检查脚本
+RUN echo '#!/bin/sh\nwget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1' > /healthcheck.sh && \
+    chmod +x /healthcheck.sh
+
 # 暴露端口
 EXPOSE 3000
 
+# 添加健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD /healthcheck.sh
+
 # 启动应用
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["/start.sh"]
