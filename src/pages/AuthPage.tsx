@@ -146,7 +146,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
-      <div className="w-full max-w-4xl grid md:grid-cols-2 gap-8 items-center">
+      <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
         {/* 左侧：产品介绍 */}
         <div className="space-y-6 text-white">
           <div className="space-y-4">
@@ -175,7 +175,7 @@ export default function AuthPage() {
         </div>
 
         {/* 右侧：认证卡片 */}
-        <div className="w-full max-w-md mx-auto">
+        <div className="w-full max-w-lg mx-auto">
           <Card className="glass-dark border-gray-700/50 overflow-hidden">
             <CardHeader className="space-y-4 text-center pb-4">
               {/* 模式切换标签 */}
@@ -217,7 +217,7 @@ export default function AuthPage() {
               </div>
             </CardHeader>
             
-            <CardContent className="space-y-6 pt-0">
+            <CardContent className="space-y-8 pt-0">
               {/* 错误和成功消息 */}
               {error && (
                 <div className="text-red-400 text-sm text-center bg-red-500/10 p-3 rounded-lg border border-red-500/20 backdrop-blur-sm">
@@ -232,8 +232,8 @@ export default function AuthPage() {
               )}
 
               {/* 邮箱登录/注册表单 */}
-              <form onSubmit={handleEmailAuth} className="space-y-5">
-                <div className="space-y-2">
+              <form onSubmit={handleEmailAuth} className="space-y-6">
+                <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-300 block">邮箱</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -242,14 +242,14 @@ export default function AuthPage() {
                       placeholder="输入邮箱地址"
                       value={formData.email}
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12"
+                      className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-14"
                       disabled={loading}
                       autoComplete="email"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="text-sm font-medium text-gray-300 block">密码</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -258,7 +258,7 @@ export default function AuthPage() {
                       placeholder={authMode === 'register' ? '设置密码（至少6位）' : '输入密码'}
                       value={formData.password}
                       onChange={(e) => setFormData({...formData, password: e.target.value})}
-                      className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12"
+                      className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-14"
                       disabled={loading}
                       autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
                     />
@@ -266,7 +266,7 @@ export default function AuthPage() {
                 </div>
 
                 {authMode === 'register' && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <label className="text-sm font-medium text-gray-300 block">确认密码</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -275,7 +275,7 @@ export default function AuthPage() {
                         placeholder="再次输入密码"
                         value={formData.confirmPassword}
                         onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                        className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-12"
+                        className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 h-14"
                         disabled={loading}
                         autoComplete="new-password"
                       />
@@ -285,7 +285,7 @@ export default function AuthPage() {
 
                 <Button
                   type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 h-12 transition-all duration-200"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-4 h-14 transition-all duration-200"
                   disabled={loading || authLoading || !formData.email || !formData.password}
                 >
                   {loading || authLoading ? (
@@ -315,7 +315,7 @@ export default function AuthPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-gray-600/50 text-gray-300 hover:bg-gray-800/50 hover:border-gray-500 h-12 transition-all duration-200"
+                className="w-full border-gray-600/50 text-gray-300 hover:bg-gray-800/50 hover:border-gray-500 h-14 transition-all duration-200"
                 onClick={handleAnonymousLogin}
                 disabled={loading || authLoading}
               >

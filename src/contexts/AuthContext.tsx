@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { app } from '../utils/cloudbase';
+import { app, ensureLogin } from '../utils/cloudbase';
 
 interface User {
   id: string;
@@ -43,6 +43,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     // 初始化时检查登录状态
@@ -51,15 +52,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkLoginStatus = async () => {
     try {
+      // 直接使用CloudBase auth API检查登录状态
       const auth = app.auth();
-      const loginState = await auth.getLoginState();
+      let loginState = await auth.getLoginState();
       
-      if (loginState && loginState.isLoggedIn) {
-        // 用户已登录，获取用户信息
+      console.log('CloudBase登录状态:', loginState, typeof loginState);
+      
+      // 处理CloudBase返回值的不同格式
+      const isLoggedIn = loginState === true || 
+                        (loginState && loginState.isLoggedIn === true) ||
+                        (typeof loginState === 'object' && loginState.user);
+      
+      if (!isLoggedIn) {
+        // 如果未登录，执行匿名登录
+        console.log('执行匿名登录...');
+        await auth.signInAnonymously();
+        loginState = await auth.getLoginState();
+        console.log('匿名登录后状态:', loginState, typeof loginState);
+      }
+      
+      // 再次检查登录状态
+      const finalLoggedIn = loginState === true || 
+                           (loginState && loginState.isLoggedIn === true) ||
+                           (typeof loginState === 'object' && loginState.user);
+      
+      if (finalLoggedIn) {
+        // 用户已登录CloudBase，设置登录状态
+        setIsLoggedIn(true);
+        console.log('用户登录状态确认：已登录');
+        // 尝试获取用户信息
         await loadUserInfo();
+      } else {
+        setIsLoggedIn(false);
+        console.log('用户登录状态确认：未登录');
       }
     } catch (error) {
       console.error('检查登录状态失败:', error);
+      setIsLoggedIn(false);
     } finally {
       setIsLoading(false);
     }
@@ -86,11 +115,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           correctRate: userData.correctRate,
           streakDays: userData.streakDays,
           lastStudyDate: userData.lastStudyDate,
-          isNewUser: userData.isNewUser
+          isNewUser: userData.isNewUser,
+          email: userData.email
         });
+      } else {
+        // 用户信息获取失败，但登录状态仍然有效
+        console.warn('用户信息获取失败，但保持登录状态');
       }
     } catch (error) {
       console.error('获取用户信息失败:', error);
+      // 不要因为用户信息获取失败就重置登录状态
     }
   };
 
@@ -116,6 +150,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const auth = app.auth();
         await auth.signInAnonymously();
         
+        // 设置登录状态
+        setIsLoggedIn(true);
+        
         // 加载用户信息
         await loadUserInfo();
       } else {
@@ -127,6 +164,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const loginState = await auth.getLoginState();
         
         if (loginState && loginState.isLoggedIn) {
+          // 设置登录状态
+          setIsLoggedIn(true);
           // 加载用户信息
           await loadUserInfo();
         }
@@ -169,10 +208,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const auth = app.auth();
       await auth.signOut();
       setUser(null);
+      setIsLoggedIn(false);
     } catch (error) {
       console.error('登出失败:', error);
       // 即使CloudBase登出失败，也清除本地用户状态
       setUser(null);
+      setIsLoggedIn(false);
     }
   };
 
@@ -208,7 +249,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const isLoggedIn = !!user;
+  // isLoggedIn 状态已经在上面定义为状态变量，不再依赖user对象
 
   const value: AuthContextType = {
     user,

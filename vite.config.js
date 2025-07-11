@@ -5,19 +5,29 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/', // 云托管使用绝对路径
+  base: '/', // 静态托管使用根路径
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
     }
   },
-  server: {
-    host: '127.0.0.1',  // 使用IP地址代替localhost
-    proxy: {
-      '/__auth': {
-        target: 'https://cloud1-7g7oatv381500c81.tcloudbaseapp.com/',
-        changeOrigin: true,
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+    // 优化静态托管的构建配置
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['framer-motion', '@heroicons/react', 'lucide-react']
+        }
       }
     }
+  },
+  server: {
+    host: '127.0.0.1',  // 开发环境使用IP地址
+    port: 5173
   }
 })

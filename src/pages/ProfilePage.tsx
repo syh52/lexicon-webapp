@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   User, 
   Settings, 
@@ -16,17 +17,36 @@ import {
 } from 'lucide-react';
 
 export default function ProfilePage() {
-  // 模拟用户数据
+  const { user: authUser, logout, isLoggedIn } = useAuth();
+
+  // 如果用户未登录，显示登录提示
+  if (!isLoggedIn) {
+    return (
+      <div className="flex items-center justify-center min-h-screen p-6">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-bold mb-4">请先登录</h2>
+            <p className="text-gray-600 mb-4">您需要登录才能查看个人资料</p>
+            <Button onClick={() => window.location.href = '/#/login'}>
+              前往登录
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // 使用真实用户数据，提供合理的默认值
   const user = {
-    name: '英语学习者',
-    email: 'user@example.com',
-    avatar: null,
-    level: 15,
-    exp: 2340,
-    nextLevelExp: 3000,
-    joinDate: '2024-01-15',
-    totalWords: 1250,
-    streak: 7
+    name: authUser?.displayName || '新用户',
+    email: authUser?.email || '未设置邮箱',
+    avatar: authUser?.avatar || null,
+    level: authUser?.level || 1,
+    exp: (authUser?.level || 1) * 200 + (authUser?.studiedWords || 0) * 10, // 计算经验值
+    nextLevelExp: ((authUser?.level || 1) + 1) * 300,
+    joinDate: '2024-01-15', // 暂时使用默认值，后续可以从数据库获取
+    totalWords: authUser?.totalWords || 0,
+    streak: authUser?.streakDays || 0
   };
 
   const expProgress = (user.exp / user.nextLevelExp) * 100;
@@ -39,9 +59,14 @@ export default function ProfilePage() {
     { icon: HelpCircle, label: '帮助与支持', description: '查看使用指南和联系客服' },
   ];
 
-  const handleLogout = () => {
-    // 实现退出登录逻辑
-    console.log('用户退出登录');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // 退出登录后跳转到首页
+      window.location.href = '/';
+    } catch (error) {
+      console.error('退出登录失败:', error);
+    }
   };
 
   return (

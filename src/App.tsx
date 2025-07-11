@@ -17,7 +17,6 @@ function App() {
             <Route path="/login" element={<AuthPage />} />
             <Route path="/register" element={<AuthPage />} />
             <Route path="/" element={<HomePage />} />
-            <Route path="/vocabulary" element={<WordbooksPage />} />
             <Route path="/wordbooks" element={<WordbooksPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/profile" element={<ProfilePage />} />

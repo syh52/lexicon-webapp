@@ -1,45 +1,40 @@
-# Lexicon 背单词 WebApp
+# Lexicon 英语学习平台
 
-一个基于云开发的现代化英语背单词应用，采用FSRS智能复习算法，帮助用户高效记忆单词。
+一个现代化的英语学习Web应用，专为吉祥航空安全员定制，提供优质的英语学习体验。
 
+[![Powered by CloudBase](https://7463-tcb-advanced-a656fc-1257967285.tcb.qcloud.la/mcp/powered-by-cloudbase-badge.svg)](https://github.com/TencentCloudBase/CloudBase-AI-ToolKit)
 
-[![Powered by CloudBase](https://7463-tcb-advanced-a656fc-1257967285.tcb.qcloud.la/mcp/powered-by-cloudbase-badge.svg)](https://github.com/TencentCloudBase/CloudBase-AI-ToolKit)  
+## 🚀 在线体验
 
-> 本项目基于 [**CloudBase AI ToolKit**](https://github.com/TencentCloudBase/CloudBase-AI-ToolKit) 开发，通过AI提示词和 MCP 协议+云开发，让开发更智能、更高效，支持AI生成全栈代码、一键部署至腾讯云开发（免服务器）、智能日志修复。
+**[https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com/](https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com/)**
 
-## 🚀 项目概述
+## ✨ 项目特色
 
-**Lexicon** 是为吉祥航空航空安保部安全员设计的英语学习工具，支持碎片化、常态化学习，提供个性化的单词复习体验。
+**Lexicon** 为吉祥航空安全员提供专业的英语学习解决方案，支持碎片化学习和个性化复习。
 
-### 主要功能
+### 核心功能
 
-- ✅ **用户认证系统** - 支持邮箱注册/登录和匿名登录
-- ✅ **词书管理** - 预置基础英语词汇库（50个词汇）
-- ✅ **智能复习** - 集成FSRS算法，优化记忆曲线
-- ✅ **学习统计** - 详细的学习进度和成就系统
-- ✅ **响应式设计** - 适配桌面和移动设备
-- ✅ **暗色主题** - 现代化毛玻璃效果界面
+- ✅ **完善的认证系统** - 邮箱注册/登录 + 匿名快速体验
+- ✅ **词汇学习模块** - 个性化词汇管理和学习
+- ✅ **情景对话** - 实用的英语对话练习
+- ✅ **智能测验** - 自适应学习评估
+- ✅ **学习统计** - 详细的进度跟踪
+- ✅ **现代UI设计** - Glass Morphism风格，优秀的用户体验
 
-## 项目架构
+## 🛠 技术架构
 
-### 前端架构
-
-- **框架**：React 18
-- **构建工具**：Vite
-- **路由**：React Router 6（使用 HashRouter）
-- **样式**：Tailwind CSS + DaisyUI
-- **动画**：Framer Motion
+### 前端技术栈
+- **React 18** + **TypeScript** - 现代化前端开发
+- **Vite** - 极速构建工具
+- **React Router 6** - 单页应用路由管理  
+- **Tailwind CSS** + **DaisyUI** - 原子化CSS框架
+- **Framer Motion** - 流畅动画效果
 
 ### 云开发资源
-
-本项目使用了以下腾讯云开发（CloudBase）资源：
-
-- **身份认证**：用于用户登录和身份验证
-- **云数据库**：存储用户学习记录、单词本、学习进度等数据
-- **云函数**：实现AI评估、学习分析、数据处理等业务逻辑
-- **云存储**：存储音频文件、图片等学习资源
-- **云托管**：用于部署前端应用（容器化部署）
-- **AI能力**：集成云开发AI服务，提供智能学习建议和评估
+- **CloudBase 认证** - 用户身份管理
+- **云数据库** - 用户数据和学习记录存储
+- **云函数** - 业务逻辑处理
+- **静态网站托管** - 前端应用部署
 
 ## 开始使用
 
