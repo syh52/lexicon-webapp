@@ -32,4 +32,4 @@ echo "🌐 Starting static file server on 0.0.0.0:3000..."
 echo "📍 Serving files from: $(pwd)/dist"
 
 # 启动服务，监听所有接口
-exec serve -s dist -l 0.0.0.0:3000 --no-clipboard
+exec serve -s dist -p 3000 --no-clipboard
