@@ -1,0 +1,40 @@
+{
+  "envId": "cloud1-7g7oatv381500c81",
+  "version": "2.0",
+  "functionRoot": "./cloudfunctions",
+  "$schema": "https://framework-1258016615.tcloudbaseapp.com/schema/latest.json",
+  "functions": [
+    {
+      "name": "auth",
+      "timeout": 15,
+      "envVariables": {},
+      "runtime": "Nodejs18.15",
+      "memory": 128,
+      "handler": "index.main"
+    },
+    {
+      "name": "reviewUpdate", 
+      "timeout": 15,
+      "envVariables": {},
+      "runtime": "Nodejs18.15",
+      "memory": 128,
+      "handler": "index.main"
+    }
+  ],
+  "framework": {
+    "name": "lexicon-vocabulary-app",
+    "plugins": {
+      "client": {
+        "use": "@cloudbase/framework-plugin-container",
+        "inputs": {
+          "serviceName": "lexicon-app",
+          "servicePath": "/lexicon",
+          "localPath": "./",
+          "buildCommand": "npm run build",
+          "dockerfile": "./Dockerfile",
+          "containerPort": 3000
+        }
+      }
+    }
+  }
+}
