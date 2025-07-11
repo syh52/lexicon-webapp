@@ -1,0 +1,55 @@
+# CloudBase 云托管服务配置
+apiVersion: v1
+kind: Service
+metadata:
+  name: lexicon-webapp
+spec:
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: lexicon-webapp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lexicon-webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lexicon-webapp
+  template:
+    metadata:
+      labels:
+        app: lexicon-webapp
+    spec:
+      containers:
+      - name: lexicon-webapp
+        image: lexicon-webapp:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
