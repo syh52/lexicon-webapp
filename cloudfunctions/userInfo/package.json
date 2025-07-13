@@ -4,7 +4,8 @@
   "description": "用户信息管理云函数",
   "main": "index.js",
   "dependencies": {
-    "wx-server-sdk": "latest"
+    "@cloudbase/node-sdk": "latest",
+    "bcryptjs": "^2.4.3"
   },
   "author": "Lexicon WebApp",
   "license": "MIT"

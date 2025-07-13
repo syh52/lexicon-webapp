@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -18,6 +19,7 @@ import {
 
 export default function ProfilePage() {
   const { user: authUser, logout, isLoggedIn } = useAuth();
+  const navigate = useNavigate();
 
   // 如果用户未登录，显示登录提示
   if (!isLoggedIn) {
@@ -27,7 +29,7 @@ export default function ProfilePage() {
           <CardContent className="p-6 text-center">
             <h2 className="text-xl font-bold mb-4">请先登录</h2>
             <p className="text-gray-600 mb-4">您需要登录才能查看个人资料</p>
-            <Button onClick={() => window.location.href = '/#/login'}>
+            <Button onClick={() => navigate('/login')}>
               前往登录
             </Button>
           </CardContent>
@@ -62,8 +64,8 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     try {
       await logout();
-      // 退出登录后跳转到首页
-      window.location.href = '/';
+      // 退出登录后跳转到登录页面
+      navigate('/login', { replace: true });
     } catch (error) {
       console.error('退出登录失败:', error);
     }
