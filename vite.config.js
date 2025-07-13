@@ -5,7 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/', // 静态托管使用根路径
+  base: './', // 使用相对路径，适配子目录部署
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')

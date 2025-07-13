@@ -8,6 +8,16 @@ import ProfilePage from './pages/ProfilePage'
 import AppLayout from './components/layout/AppLayout'
 import './App.css'
 
+// 在开发环境引入配置验证
+if (process.env.NODE_ENV === 'development') {
+  import('./utils/cloudbase-test.js').then(({ validateConfiguration }) => {
+    // 延迟执行配置验证
+    setTimeout(() => {
+      validateConfiguration().catch(console.error);
+    }, 3000);
+  }).catch(console.error);
+}
+
 function App() {
   return (
     <AuthProvider>

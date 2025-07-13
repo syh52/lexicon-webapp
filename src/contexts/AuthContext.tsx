@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { app } from '../utils/cloudbase';
+import { app, ensureLogin, getLoginState } from '../utils/cloudbase';
 
 interface User {
   uid: string; // CloudBase 用户 ID
   displayName: string;
-  email: string;
+  username: string; // 用户名（登录用）
+  email: string; // 邮箱地址
   avatar?: string;
   level: number;
   totalWords: number;
@@ -19,7 +20,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserInfo: (userInfo: Partial<User>) => Promise<void>;
   isLoggedIn: boolean;
@@ -51,38 +52,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkLoginStatus = async () => {
     try {
-      const auth = app.auth();
-      const loginState = await auth.getLoginState();
-      
-      if (loginState && loginState.isLoggedIn) {
-        // 用户已登录，获取用户信息
-        const currentUser = await auth.getCurrentUser();
-        if (currentUser) {
-          // 从 CloudBase 获取基础用户信息，然后补充学习数据
-          const userInfo = await auth.getUserInfo();
-          
-          // 通过云函数获取学习相关数据
-          const learningData = await app.callFunction({
-            name: 'userInfo',
-            data: { userId: currentUser.uid }
-          });
-          
+      // 检查CloudBase登录状态
+      const loginState = await getLoginState();
+      if (loginState && loginState.isLoggedIn && loginState.user) {
+        // 用户已登录，获取或创建用户信息
+        const userInfoResult = await app.callFunction({
+          name: 'userInfo',
+          data: { 
+            action: 'getOrCreate',
+            userId: loginState.user.uid,
+            displayName: loginState.user.customUserId || loginState.user.uid
+          }
+        });
+        
+        if (userInfoResult.result?.success) {
+          const userInfo = userInfoResult.result.data;
           const userData: User = {
-            uid: currentUser.uid,
-            displayName: userInfo.name || currentUser.email.split('@')[0],
-            email: currentUser.email,
-            avatar: userInfo.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.email}`,
-            level: learningData.result?.level || 1,
-            totalWords: learningData.result?.totalWords || 0,
-            studiedWords: learningData.result?.studiedWords || 0,
-            correctRate: learningData.result?.correctRate || 0,
-            streakDays: learningData.result?.streakDays || 0,
-            lastStudyDate: learningData.result?.lastStudyDate || null
+            uid: loginState.user.uid,
+            displayName: userInfo.displayName,
+            username: loginState.user.customUserId || loginState.user.uid,
+            email: loginState.user.customUserId || '未设置邮箱', // 使用customUserId作为邮箱
+            avatar: userInfo.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${loginState.user.uid}`,
+            level: userInfo.level || 1,
+            totalWords: userInfo.totalWords || 0,
+            studiedWords: userInfo.studiedWords || 0,
+            correctRate: userInfo.correctRate || 0,
+            streakDays: userInfo.streakDays || 0,
+            lastStudyDate: userInfo.lastStudyDate || null
           };
           
           setUser(userData);
           setIsLoggedIn(true);
-          console.log('用户已登录，从 CloudBase 恢复状态');
+          console.log('用户已登录，从CloudBase恢复状态');
+        } else {
+          setUser(null);
+          setIsLoggedIn(false);
         }
       } else {
         console.log('用户未登录');
@@ -99,49 +103,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
 
+
+  // 邮箱+密码登录
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const auth = app.auth();
       
-      // 使用 CloudBase 标准登录 API
+      console.log('使用邮箱+密码登录:', email);
       const loginState = await auth.signIn({
-        username: email,
+        username: email, // CloudBase v2中，邮箱登录时username字段填邮箱
         password: password
       });
       
       if (loginState && loginState.user) {
-        // 获取用户信息
-        const userInfo = await auth.getUserInfo();
-        
-        // 通过云函数获取或初始化学习数据
-        const learningData = await app.callFunction({
+        // 获取或创建用户信息
+        const userInfoResult = await app.callFunction({
           name: 'userInfo',
           data: { 
+            action: 'getOrCreate',
             userId: loginState.user.uid,
-            action: 'getOrCreate'
+            displayName: loginState.user.customUserId || email.split('@')[0]
           }
         });
         
-        const userData: User = {
-          uid: loginState.user.uid,
-          displayName: userInfo.name || email.split('@')[0],
-          email: loginState.user.email,
-          avatar: userInfo.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-          level: learningData.result?.level || 1,
-          totalWords: learningData.result?.totalWords || 0,
-          studiedWords: learningData.result?.studiedWords || 0,
-          correctRate: learningData.result?.correctRate || 0,
-          streakDays: learningData.result?.streakDays || 0,
-          lastStudyDate: learningData.result?.lastStudyDate || null
-        };
-        
-        setUser(userData);
-        setIsLoggedIn(true);
-        
-        console.log('登录成功');
-      } else {
-        throw new Error('登录失败');
+        if (userInfoResult.result?.success) {
+          const userInfo = userInfoResult.result.data;
+          const userData: User = {
+            uid: loginState.user.uid,
+            displayName: userInfo.displayName,
+            username: email,
+            email: email,
+            avatar: userInfo.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
+            level: userInfo.level || 1,
+            totalWords: userInfo.totalWords || 0,
+            studiedWords: userInfo.studiedWords || 0,
+            correctRate: userInfo.correctRate || 0,
+            streakDays: userInfo.streakDays || 0,
+            lastStudyDate: userInfo.lastStudyDate || null
+          };
+          
+          setUser(userData);
+          setIsLoggedIn(true);
+          console.log('邮箱登录成功');
+        } else {
+          throw new Error(userInfoResult.result?.error || '获取用户信息失败');
+        }
       }
     } catch (error) {
       console.error('登录失败:', error);
@@ -151,33 +158,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (email: string, password: string) => {
+  // 邮箱+密码注册（使用云函数）
+  const register = async (email: string, password: string, displayName?: string) => {
     setIsLoading(true);
     try {
-      const auth = app.auth();
+      console.log('开始注册:', email);
       
-      // 使用 CloudBase 标准注册 API
-      const loginState = await auth.signUp({
-        email: email,
-        password: password,
-        name: email.split('@')[0] // 使用邮箱前缀作为默认用户名
+      // 确保已登录（匿名登录）以便调用云函数
+      const auth = app.auth();
+      const loginState = await auth.getLoginState();
+      if (!loginState || !loginState.isLoggedIn) {
+        console.log('先进行匿名登录以获取云函数调用权限');
+        await auth.signInAnonymously();
+      }
+      
+      // 使用云函数注册
+      const registerResult = await app.callFunction({
+        name: 'userInfo',
+        data: { 
+          action: 'register',
+          email: email,
+          password: password,
+          displayName: displayName || email.split('@')[0],
+          type: 'email'
+        }
       });
       
-      if (loginState && loginState.user) {
-        // 注册成功后自动登录，初始化学习数据
-        const result = await app.callFunction({
-          name: 'userInfo',
-          data: {
-            userId: loginState.user.uid,
-            action: 'init',
-            email: email,
-            displayName: email.split('@')[0]
-          }
-        });
+      if (registerResult.result?.success) {
+        console.log('云函数注册成功，创建本地用户状态');
+        // 注册成功，创建本地用户状态
+        const userData: User = {
+          uid: registerResult.result.data.uid,
+          displayName: displayName || email.split('@')[0],
+          username: email,
+          email: email,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
+          level: 1,
+          totalWords: 0,
+          studiedWords: 0,
+          correctRate: 0,
+          streakDays: 0,
+          lastStudyDate: null
+        };
         
-        console.log('注册成功');
+        setUser(userData);
+        setIsLoggedIn(true);
+        console.log('注册成功，用户状态已设置');
       } else {
-        throw new Error('注册失败');
+        throw new Error(registerResult.result?.error || '注册失败，请重试');
       }
     } catch (error) {
       console.error('注册失败:', error);
@@ -187,11 +215,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+
   const logout = async () => {
     try {
       const auth = app.auth();
       
-      // 使用 CloudBase 标准登出 API
+      // CloudBase原生登出
       await auth.signOut();
       
       // 清除状态
@@ -213,27 +242,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('用户未登录');
       }
 
-      const auth = app.auth();
-      const currentUser = await auth.getCurrentUser();
-      
-      if (!currentUser) {
-        throw new Error('用户未登录');
-      }
-      
-      // 更新 CloudBase 基础用户信息（如果有相关字段）
-      if (userInfo.displayName) {
-        await currentUser.update({
-          name: userInfo.displayName
-        });
-      }
-      
       // 通过云函数更新学习相关数据
       const result = await app.callFunction({
         name: 'userInfo',
         data: {
-          userId: user.uid,
           action: 'update',
+          userId: user.uid,
           userInfo: {
+            displayName: userInfo.displayName,
             level: userInfo.level,
             totalWords: userInfo.totalWords,
             studiedWords: userInfo.studiedWords,
