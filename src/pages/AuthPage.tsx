@@ -40,15 +40,20 @@ export default function AuthPage() {
     password: '',
     confirmPassword: ''
   });
+  const [rememberMe, setRememberMe] = useState(false);
 
-  // 组件挂载时重置所有状态
+  // 组件挂载时重置所有状态并加载记住的用户名
   useEffect(() => {
+    const savedEmail = localStorage.getItem('lexicon_remembered_email');
+    const savedRememberMe = localStorage.getItem('lexicon_remember_me') === 'true';
+    
     setFormData({
       username: '',
-      email: '',
+      email: savedEmail || '',
       password: '',
       confirmPassword: ''
     });
+    setRememberMe(savedRememberMe);
     setError('');
     setSuccess('');
     setShowPassword(false);
@@ -58,12 +63,16 @@ export default function AuthPage() {
 
   // 当模式切换时清空表单和消息
   useEffect(() => {
+    const savedEmail = localStorage.getItem('lexicon_remembered_email');
+    const savedRememberMe = localStorage.getItem('lexicon_remember_me') === 'true';
+    
     setFormData({
       username: '',
-      email: '',
+      email: authMode === 'login' && savedRememberMe ? savedEmail || '' : '',
       password: '',
       confirmPassword: ''
     });
+    setRememberMe(authMode === 'login' ? savedRememberMe : false);
     setError('');
     setSuccess('');
     setShowPassword(false);
@@ -102,6 +111,16 @@ export default function AuthPage() {
     }
   };
 
+  // 处理记住我复选框变化
+  const handleRememberMeChange = (checked: boolean) => {
+    setRememberMe(checked);
+    if (!checked) {
+      // 如果取消记住我，立即清除保存的邮箱
+      localStorage.removeItem('lexicon_remembered_email');
+      localStorage.removeItem('lexicon_remember_me');
+    }
+  };
+
   // 登录处理
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +149,16 @@ export default function AuthPage() {
 
     try {
       await login(formData.email, formData.password);
+      
+      // 处理记住我功能
+      if (rememberMe) {
+        localStorage.setItem('lexicon_remembered_email', formData.email);
+        localStorage.setItem('lexicon_remember_me', 'true');
+      } else {
+        localStorage.removeItem('lexicon_remembered_email');
+        localStorage.removeItem('lexicon_remember_me');
+      }
+      
       setSuccess('登录成功！正在跳转...');
       navigate('/', { replace: true });
     } catch (error: any) {
@@ -311,9 +340,24 @@ export default function AuthPage() {
               {/* 记住我和忘记密码 */}
               <div className="flex items-center justify-between">
                 <label className="flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only" />
+                  <input 
+                    type="checkbox" 
+                    className="sr-only" 
+                    checked={rememberMe}
+                    onChange={(e) => handleRememberMeChange(e.target.checked)}
+                  />
                   <div className="relative">
-                    <div className="w-5 h-5 bg-gray-700 border border-gray-600 rounded transition-all duration-200"></div>
+                    <div className={`w-5 h-5 border rounded transition-all duration-200 ${
+                      rememberMe 
+                        ? 'bg-purple-500 border-purple-500' 
+                        : 'bg-gray-700 border-gray-600'
+                    }`}>
+                      {rememberMe && (
+                        <svg className="w-3 h-3 text-white absolute top-0.5 left-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
                   <span className="ml-2 text-sm text-gray-300">记住我</span>
                 </label>
@@ -466,7 +510,7 @@ export default function AuthPage() {
         </main>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeInUp {
           from {
             opacity: 0;

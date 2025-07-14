@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen, Play, BarChart3 } from 'lucide-react';
-import cloudbase from '@/utils/cloudbase';
+import { sampleWordbook } from '@/data/sampleWords';
 
 interface Wordbook {
   _id: string;
@@ -26,12 +26,8 @@ export default function WordbooksPage() {
 
   const loadWordbooks = async () => {
     try {
-      const db = cloudbase.app.database();
-      const result = await db.collection('wordbooks').get();
-      
-      if (result.data) {
-        setWordbooks(result.data);
-      }
+      // 暂时使用示例数据
+      setWordbooks([sampleWordbook]);
     } catch (error) {
       console.error('加载词书失败:', error);
     } finally {
