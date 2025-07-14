@@ -10,11 +10,11 @@
   font-display: swap;
 }
 
-/* Modern smooth font rendering for Inter */
+/* Modern smooth font rendering with Chinese support */
 body {
-  font-family: 'Inter', sans-serif; 
+  font-family: 'Noto Sans SC', 'Inter', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'SimHei', 'SimSun', sans-serif; 
   -webkit-font-smoothing: antialiased;
- -moz-osx-font-smoothing: grayscale;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer base {
@@ -107,6 +107,16 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Chinese font support */
+  .font-chinese {
+    font-family: 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'SimHei', 'SimSun', sans-serif;
+  }
+  
+  /* Ensure all text has proper Chinese font support */
+  h1, h2, h3, h4, h5, h6, p, span, div, input, textarea, button {
+    font-family: 'Noto Sans SC', 'Inter', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'SimHei', 'SimSun', sans-serif;
   }
   
   /* Glass morphism utilities */

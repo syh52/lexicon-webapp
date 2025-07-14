@@ -33,3 +33,94 @@
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* 3D翻转卡片效果 */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* 学习卡片增强样式 */
+.study-card {
+  transition: all 0.3s ease;
+  transform-style: preserve-3d;
+}
+
+.study-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* 评分按钮增强动画 */
+.rating-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.rating-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.rating-button:hover::before {
+  left: 100%;
+}
+
+/* 语音播放按钮样式 */
+.audio-button {
+  transition: all 0.2s ease;
+}
+
+.audio-button:hover {
+  transform: scale(1.1);
+  color: #60a5fa;
+}
+
+/* 进度条增强样式 */
+.progress-bar {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background-image: linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.2) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.2) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 50px 50px;
+  animation: move 2s linear infinite;
+}
+
+@keyframes move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 50px 50px;
+  }
+}

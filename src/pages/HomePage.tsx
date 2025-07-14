@@ -7,7 +7,7 @@ import { BookOpen, MessageCircle, CheckCircle, User, Upload, Settings, Zap } fro
 // 展示了Glass Morphism风格和现代化的交互设计
 
 export default function HomePage() {
-  const { user, isLoggedIn, isLoading } = useAuth();
+  const { user, isLoggedIn, isLoading, anonymousLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleDailyCheckIn = () => {
@@ -16,6 +16,15 @@ export default function HomePage() {
 
   const navigateToLogin = () => {
     navigate('/login');
+  };
+
+  const handleAnonymousLogin = async () => {
+    try {
+      await anonymousLogin();
+      console.log('匿名登录成功');
+    } catch (error) {
+      console.error('匿名登录失败:', error);
+    }
   };
 
   const navigateToVocabulary = () => {
@@ -196,12 +205,20 @@ export default function HomePage() {
             </div>
             <h3 className="text-lg sm:text-xl md:text-2xl font-inter font-semibold text-white mb-3 sm:mb-4">开始你的学习之旅</h3>
             <p className="text-sm sm:text-base text-gray-400 mb-6 sm:mb-8 md:mb-10 leading-relaxed max-w-md mx-auto">登录后即可查看学习进度，解锁更多功能</p>
-            <button 
-              onClick={navigateToLogin}
-              className="w-full sm:w-auto sm:px-12 gradient-primary text-white py-3.5 px-6 rounded-2xl text-sm sm:text-base font-medium modern-focus cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
-            >
-              立即登录
-            </button>
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
+              <button 
+                onClick={navigateToLogin}
+                className="w-full sm:w-auto sm:px-12 gradient-primary text-white py-3.5 px-6 rounded-2xl text-sm sm:text-base font-medium modern-focus cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
+              >
+                立即登录
+              </button>
+              <button 
+                onClick={handleAnonymousLogin}
+                className="w-full sm:w-auto sm:px-12 glass-card-strong text-white py-3.5 px-6 rounded-2xl text-sm sm:text-base font-medium modern-focus cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg border border-white/20"
+              >
+                游客体验
+              </button>
+            </div>
           </div>
         </div>
       )}

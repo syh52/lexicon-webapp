@@ -139,13 +139,11 @@ async function createUserInfo(userId, userInfo = {}) {
       correctRate: 0,
       streakDays: 0,
       lastStudyDate: null,
-      createdAt: db.serverDate(),
-      updatedAt: db.serverDate()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
-    const result = await db.collection('users').add({
-      data: userData
-    });
+    const result = await db.collection('users').add(userData);
 
     if (result.id) {
       return {
@@ -235,7 +233,7 @@ async function updateUserInfo(userId, userInfo) {
     // 准备更新数据
     const updateData = {
       ...userInfo,
-      updatedAt: db.serverDate()
+      updatedAt: new Date()
     };
 
     // 移除不允许更新的字段
@@ -303,7 +301,7 @@ async function updateUserInfoByIdentifier(identifier, userInfo, type = 'email') 
     // 准备更新数据
     const updateData = {
       ...userInfo,
-      updatedAt: db.serverDate()
+      updatedAt: new Date()
     };
 
     // 移除不允许更新的字段
@@ -477,8 +475,8 @@ async function registerUser(identifier, password, displayName, type = 'email') {
       correctRate: 0,
       streakDays: 0,
       lastStudyDate: null,
-      createdAt: db.serverDate(),
-      updatedAt: db.serverDate()
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     // 如果是邮箱注册，也要设置username字段为空或默认值
@@ -488,11 +486,14 @@ async function registerUser(identifier, password, displayName, type = 'email') {
       userData.email = ''; // 如果是用户名注册，邮箱字段为空
     }
 
-    const result = await db.collection('users').add({
-      data: userData
-    });
+    console.log('准备写入数据库，用户数据:', JSON.stringify(userData, null, 2));
+    
+    const result = await db.collection('users').add(userData);
+
+    console.log('数据库写入结果:', JSON.stringify(result, null, 2));
 
     if (result.id) {
+      console.log('注册成功，用户ID:', result.id);
       return {
         success: true,
         data: {
@@ -509,6 +510,7 @@ async function registerUser(identifier, password, displayName, type = 'email') {
         }
       };
     } else {
+      console.error('注册失败，无插入ID');
       return {
         success: false,
         error: '注册失败'
