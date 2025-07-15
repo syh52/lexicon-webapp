@@ -11,6 +11,7 @@
     "start": "serve -s dist -l 3000"
   },
   "dependencies": {
+    "@cloudbase/cli": "^2.7.7",
     "@cloudbase/js-sdk": "^2.16.0",
     "@heroicons/react": "^2.2.0",
     "@playwright/test": "^1.54.1",
