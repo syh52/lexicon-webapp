@@ -6,8 +6,11 @@ import { StudyProgress } from '../components/study/StudyProgress';
 import { StudyStats } from '../components/study/StudyStats';
 import { Button } from '../components/ui/button';
 import { ArrowLeft, RotateCcw, Settings } from 'lucide-react';
-import { FSRSScheduler, RATINGS, initNewCard, scheduleCard } from '../utils/fsrs';
-import { sampleWords } from '../data/sampleWords';
+// @ts-ignore
+import { FSRSScheduler, RATINGS, initNewCard, scheduleCard } from '../utils/fsrs.js';
+import wordbookService, { Word, StudyRecord } from '../services/wordbookService';
+// @ts-ignore
+import { app } from '../utils/cloudbase.js';
 
 interface StudySession {
   wordbookId: string;
@@ -47,8 +50,77 @@ export default function StudyPage() {
     try {
       setIsLoading(true);
       
-      // 暂时使用示例数据
-      const cards = [...sampleWords];
+      if (!user || !wordbookId) {
+        console.error('缺少用户或词书ID');
+        return;
+      }
+      
+      // 通过云函数获取真实的单词数据
+      const result = await app.callFunction({
+        name: 'getWordsByWordbook',
+        data: { wordbookId }
+      });
+      
+      console.log('云函数返回的单词数据:', result);
+      
+      if (!result.result?.success || !result.result?.data) {
+        console.error('无法获取单词数据:', result.result?.error);
+        setIsLoading(false);
+        navigate('/wordbooks');
+        return;
+      }
+      
+      const words = result.result.data;
+      
+      if (words.length === 0) {
+        console.warn('该词书没有单词数据');
+        setIsLoading(false);
+        navigate('/wordbooks');
+        return;
+      }
+      
+      const studyRecords = await wordbookService.getUserStudyRecords(user.uid, wordbookId);
+      console.log('获取学习记录完成:', studyRecords);
+      
+      // 为每个单词创建学习卡片
+      console.log('开始创建学习卡片...');
+      const cards = words.map((word: any) => {
+        const existingRecord = studyRecords.find(r => r.wordId === word._id);
+        
+        let fsrsData;
+        if (existingRecord) {
+          // 使用现有的学习记录
+          fsrsData = {
+            difficulty: existingRecord.difficulty,
+            stability: existingRecord.stability,
+            retrievability: existingRecord.retrievability,
+            status: existingRecord.status,
+            due: existingRecord.due,
+            lapses: existingRecord.lapses,
+            reps: existingRecord.reps,
+            elapsedDays: existingRecord.elapsedDays,
+            scheduledDays: existingRecord.scheduledDays
+          };
+        } else {
+          // 新单词，使用FSRS初始化
+          fsrsData = initNewCard();
+        }
+        
+        return {
+          _id: word._id,
+          word: word.word,
+          meanings: [{
+            partOfSpeech: word.pos || 'n.',
+            definition: word.meaning,
+            example: word.example || `Example with ${word.word}`
+          }],
+          pronunciation: word.phonetic || word.word,
+          fsrs: fsrsData,
+          originalWord: word
+        };
+      });
+      
+      console.log('创建学习卡片完成，共', cards.length, '个卡片');
       
       // 初始化学习会话
       const newSession: StudySession = {
@@ -57,8 +129,8 @@ export default function StudyPage() {
         currentIndex: 0,
         totalCards: cards.length,
         completedCards: 0,
-        newCards: cards.filter(card => card.fsrs.status === 'new').length,
-        reviewCards: cards.filter(card => card.fsrs.status === 'review').length,
+        newCards: cards.filter((card: any) => card.fsrs.status === 'new').length,
+        reviewCards: cards.filter((card: any) => card.fsrs.status === 'review').length,
         stats: {
           again: 0,
           hard: 0,
@@ -67,12 +139,17 @@ export default function StudyPage() {
         }
       };
       
+      console.log('初始化学习会话:', newSession);
+      
       setSession(newSession);
       setCurrentCard(cards[0] || null);
       
       if (cards.length === 0) {
         setIsFinished(true);
       }
+      
+      console.log('学习会话初始化完成');
+      console.log('当前卡片:', cards[0]);
     } catch (error) {
       console.error('初始化学习会话失败:', error);
     } finally {
@@ -81,17 +158,34 @@ export default function StudyPage() {
   };
 
   const handleRating = async (rating: number) => {
-    if (!currentCard || !session) return;
+    if (!currentCard || !session || !user) return;
     
     try {
       // 使用FSRS算法更新卡片状态
       const updatedCard = scheduleCard(currentCard.fsrs, rating);
       
+      // 保存学习记录到CloudBase
+      await wordbookService.saveStudyRecord({
+        uid: user.uid,
+        wordId: currentCard._id,
+        wordbookId: session.wordbookId,
+        difficulty: updatedCard.difficulty,
+        stability: updatedCard.stability,
+        retrievability: updatedCard.retrievability,
+        status: updatedCard.status,
+        due: updatedCard.due,
+        lapses: updatedCard.lapses,
+        reps: updatedCard.reps,
+        elapsedDays: updatedCard.elapsedDays,
+        scheduledDays: updatedCard.scheduledDays,
+        lastReviewed: new Date()
+      });
+      
       // 更新本地状态
       const newStats = { ...session.stats };
       const ratingKey = Object.keys(RATINGS).find(key => RATINGS[key] === rating);
-      if (ratingKey) {
-        newStats[ratingKey]++;
+      if (ratingKey && ratingKey in newStats) {
+        (newStats as any)[ratingKey]++;
       }
       
       const newSession = {

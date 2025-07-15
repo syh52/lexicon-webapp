@@ -69,7 +69,7 @@ export class FSRSScheduler {
     const elapsedDays = card.due ? 
       Math.max(0, (currentTime - new Date(card.due)) / (24 * 60 * 60 * 1000)) : 0;
     
-    const newCard = { ...card };
+    let newCard = { ...card };
     newCard.reps = (newCard.reps || 0) + 1;
     newCard.elapsedDays = elapsedDays;
     
@@ -80,9 +80,9 @@ export class FSRSScheduler {
     
     // 根据评分更新状态
     if (rating === RATINGS.again) {
-      newCard = this.handleAgain(newCard);
+      newCard = { ...this.handleAgain(newCard) };
     } else {
-      newCard = this.handlePass(newCard, rating);
+      newCard = { ...this.handlePass(newCard, rating) };
     }
     
     // 设置下次复习时间

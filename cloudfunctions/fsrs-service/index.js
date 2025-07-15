@@ -59,41 +59,93 @@ exports.main = async (event, context) => {
 
 /**
  * 获取待复习的卡片
+ * 修复：使用正确的数据库集合结构
  */
 async function getDueCards(data) {
   const { userId, wordbookId, limit = 20 } = data;
   const now = new Date();
   
   try {
-    // 获取到期的卡片
-    const dueCards = await db.collection('cards')
+    // 1. 从words集合获取词汇数据
+    const wordsResult = await db.collection('words')
       .where({
-        userId: userId,
-        wordbookId: wordbookId,
-        'fsrs.due': db.command.lte(now)
+        wordbookId: wordbookId
       })
-      .orderBy('fsrs.due', 'asc')
-      .limit(limit)
       .get();
     
-    // 如果没有到期的卡片，获取一些新卡片
-    if (dueCards.data.length < limit) {
-      const newCardsLimit = limit - dueCards.data.length;
-      const newCards = await db.collection('cards')
-        .where({
-          userId: userId,
-          wordbookId: wordbookId,
-          'fsrs.status': 'new'
-        })
-        .limit(newCardsLimit)
-        .get();
+    const words = wordsResult.data || [];
+    
+    // 2. 从reviews集合获取用户的学习记录
+    const reviewsResult = await db.collection('reviews')
+      .where({
+        uid: userId,
+        wordbookId: wordbookId
+      })
+      .get();
+    
+    const reviews = reviewsResult.data || [];
+    
+    // 3. 合并数据，创建虚拟卡片
+    const cards = words.map(word => {
+      const review = reviews.find(r => r.wordId === word._id);
       
-      dueCards.data.push(...newCards.data);
-    }
+      let fsrsData;
+      if (review) {
+        // 使用现有的学习记录
+        fsrsData = {
+          difficulty: review.difficulty || 6.0,
+          stability: review.stability || 1.0,
+          retrievability: review.retrievability || 0,
+          status: review.status || 'new',
+          due: review.due || now,
+          lapses: review.lapses || 0,
+          reps: review.reps || 0,
+          elapsedDays: review.elapsedDays || 0,
+          scheduledDays: review.scheduledDays || 0
+        };
+      } else {
+        // 新卡片，使用默认FSRS状态
+        fsrsData = {
+          difficulty: 6.0,
+          stability: 1.0,
+          retrievability: 0,
+          status: 'new',
+          due: now,
+          lapses: 0,
+          reps: 0,
+          elapsedDays: 0,
+          scheduledDays: 0
+        };
+      }
+      
+      return {
+        _id: `card_${userId}_${word._id}`,
+        userId: userId,
+        wordbookId: wordbookId,
+        wordId: word._id,
+        word: word.word,
+        fsrs: fsrsData,
+        wordData: word
+      };
+    });
+    
+    // 4. 筛选到期的卡片
+    const dueCards = cards.filter(card => 
+      card.fsrs.status === 'new' || new Date(card.fsrs.due) <= now
+    );
+    
+    // 5. 按优先级排序并限制数量
+    const sortedCards = dueCards
+      .sort((a, b) => {
+        if (a.fsrs.status === 'new' && b.fsrs.status !== 'new') return -1;
+        if (a.fsrs.status !== 'new' && b.fsrs.status === 'new') return 1;
+        return new Date(a.fsrs.due) - new Date(b.fsrs.due);
+      })
+      .slice(0, limit);
     
     return {
       success: true,
-      data: dueCards.data
+      data: sortedCards
     };
     
   } catch (error) {
@@ -103,47 +155,101 @@ async function getDueCards(data) {
 
 /**
  * 提交复习结果
+ * 修复：使用正确的数据库集合结构
  */
 async function submitReview(data) {
   const { userId, cardId, rating, timeSpent } = data;
   const reviewTime = new Date();
   
   try {
-    // 获取卡片当前状态
-    const cardResult = await db.collection('cards').doc(cardId).get();
+    // 解析cardId获取wordId
+    const wordId = cardId.replace(`card_${userId}_`, '');
     
-    if (!cardResult.data) {
-      throw new Error('卡片不存在');
+    // 1. 获取单词数据
+    const wordResult = await db.collection('words').doc(wordId).get();
+    if (!wordResult.data) {
+      throw new Error('单词不存在');
+    }
+    const word = wordResult.data;
+    
+    // 2. 获取现有的学习记录
+    const reviewsResult = await db.collection('reviews')
+      .where({
+        uid: userId,
+        wordId: wordId,
+        wordbookId: word.wordbookId
+      })
+      .get();
+    
+    let currentFsrsState;
+    if (reviewsResult.data && reviewsResult.data.length > 0) {
+      const existingReview = reviewsResult.data[0];
+      currentFsrsState = {
+        difficulty: existingReview.difficulty || 6.0,
+        stability: existingReview.stability || 1.0,
+        retrievability: existingReview.retrievability || 0,
+        status: existingReview.status || 'new',
+        due: existingReview.due || reviewTime,
+        lapses: existingReview.lapses || 0,
+        reps: existingReview.reps || 0,
+        elapsedDays: existingReview.elapsedDays || 0,
+        scheduledDays: existingReview.scheduledDays || 0
+      };
+    } else {
+      // 新卡片的默认状态
+      currentFsrsState = {
+        difficulty: 6.0,
+        stability: 1.0,
+        retrievability: 0,
+        status: 'new',
+        due: reviewTime,
+        lapses: 0,
+        reps: 0,
+        elapsedDays: 0,
+        scheduledDays: 0
+      };
     }
     
-    const card = cardResult.data;
-    
-    // 获取用户FSRS参数
-    const userParams = await getUserFSRSParams({ userId, wordbookId: card.wordbookId });
+    // 3. 获取用户FSRS参数
+    const userParams = await getUserFSRSParams({ userId, wordbookId: word.wordbookId });
     const params = userParams.data || DEFAULT_FSRS_PARAMS;
     
-    // 计算新的FSRS状态
-    const beforeState = { ...card.fsrs };
+    // 4. 计算新的FSRS状态
+    const beforeState = { ...currentFsrsState };
     const afterState = calculateNextState(beforeState, rating, params);
     
-    // 更新卡片状态
-    await db.collection('cards').doc(cardId).update({
-      fsrs: afterState,
-      updatedAt: reviewTime
-    });
-    
-    // 记录学习历史
-    await db.collection('reviews').add({
-      userId: userId,
-      cardId: cardId,
-      wordbookId: card.wordbookId,
+    // 5. 更新或创建学习记录
+    const reviewRecord = {
+      uid: userId,
+      wordId: wordId,
+      wordbookId: word.wordbookId,
+      difficulty: afterState.difficulty,
+      stability: afterState.stability,
+      retrievability: afterState.retrievability,
+      status: afterState.status,
+      due: afterState.due,
+      lapses: afterState.lapses,
+      reps: afterState.reps,
+      elapsedDays: afterState.elapsedDays,
+      scheduledDays: afterState.scheduledDays,
+      lastReviewed: reviewTime,
       rating: rating,
-      reviewTime: reviewTime,
       timeSpent: timeSpent,
-      beforeState: beforeState,
-      afterState: afterState,
-      createdAt: reviewTime
-    });
+      updatedAt: reviewTime
+    };
+    
+    if (reviewsResult.data && reviewsResult.data.length > 0) {
+      // 更新现有记录
+      await db.collection('reviews')
+        .doc(reviewsResult.data[0]._id)
+        .update(reviewRecord);
+    } else {
+      // 创建新记录
+      await db.collection('reviews').add({
+        ...reviewRecord,
+        createdAt: reviewTime
+      });
+    }
     
     return {
       success: true,

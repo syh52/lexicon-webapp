@@ -15,9 +15,9 @@ export default function MobileNavigation() {
     },
     {
       label: '词汇',
-      href: '/vocabulary',
+      href: '/wordbooks',
       icon: BookOpen,
-      isActive: pathname.startsWith('/vocabulary'),
+      isActive: pathname.startsWith('/wordbooks'),
     },
     {
       label: '智能对话',

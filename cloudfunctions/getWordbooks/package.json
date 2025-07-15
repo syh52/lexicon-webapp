@@ -1,0 +1,11 @@
+{
+  "name": "getWordbooks",
+  "version": "1.0.0",
+  "description": "获取词书和单词数据",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.4.1"
+  },
+  "author": "",
+  "license": "ISC"
+} 

@@ -17,7 +17,7 @@ fi
 
 # 第二步：部署到静态网站托管
 echo "🌐 部署到静态网站托管..."
-cloudbase hosting deploy dist -e cloud1-7g7oatv381500c81
+npx tcb hosting deploy dist -e cloud1-7g7oatv381500c81
 
 # 检查部署是否成功
 if [ $? -eq 0 ]; then

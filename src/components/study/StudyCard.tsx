@@ -19,8 +19,13 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler 
 
   useEffect(() => {
     if (card && card.fsrs) {
-      const advice = getStudyAdvice(card.fsrs);
-      setStudyAdvice(advice);
+      try {
+        const advice = getStudyAdvice(card.fsrs);
+        setStudyAdvice(advice);
+      } catch (error) {
+        console.error('获取学习建议失败:', error);
+        setStudyAdvice(null);
+      }
     }
   }, [card]);
 
