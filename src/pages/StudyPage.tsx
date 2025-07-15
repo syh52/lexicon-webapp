@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { StudyCard } from '../components/study/StudyCard';
-import { StudyProgress } from '../components/study/StudyProgress';
-import { StudyStats } from '../components/study/StudyStats';
-import { Button } from '../components/ui/button';
-import { ArrowLeft, RotateCcw, Settings } from 'lucide-react';
 // @ts-ignore
-import { FSRSScheduler, RATINGS, initNewCard, scheduleCard } from '../utils/fsrs.js';
+import { 
+  SimpleReviewScheduler, 
+  DAILY_CONFIGS, 
+  WORD_STATUS,
+  processUserChoice
+} from '../utils/simpleReviewAlgorithm.js';
 import wordbookService, { Word, StudyRecord } from '../services/wordbookService';
 // @ts-ignore
 import { app } from '../utils/cloudbase.js';
@@ -21,10 +22,8 @@ interface StudySession {
   newCards: number;
   reviewCards: number;
   stats: {
-    again: number;
-    hard: number;
-    good: number;
-    easy: number;
+    known: number;
+    unknown: number;
   };
 }
 
@@ -36,9 +35,8 @@ export default function StudyPage() {
   const [session, setSession] = useState<StudySession | null>(null);
   const [currentCard, setCurrentCard] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showAnswer, setShowAnswer] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [scheduler] = useState(new FSRSScheduler());
+  const [scheduler] = useState(new SimpleReviewScheduler(DAILY_CONFIGS.standard));
 
   useEffect(() => {
     if (wordbookId && user) {
@@ -82,45 +80,32 @@ export default function StudyPage() {
       const studyRecords = await wordbookService.getUserStudyRecords(user.uid, wordbookId);
       console.log('获取学习记录完成:', studyRecords);
       
-      // 为每个单词创建学习卡片
-      console.log('开始创建学习卡片...');
-      const cards = words.map((word: any) => {
-        const existingRecord = studyRecords.find(r => r.wordId === word._id);
-        
-        let fsrsData;
-        if (existingRecord) {
-          // 使用现有的学习记录
-          fsrsData = {
-            difficulty: existingRecord.difficulty,
-            stability: existingRecord.stability,
-            retrievability: existingRecord.retrievability,
-            status: existingRecord.status,
-            due: existingRecord.due,
-            lapses: existingRecord.lapses,
-            reps: existingRecord.reps,
-            elapsedDays: existingRecord.elapsedDays,
-            scheduledDays: existingRecord.scheduledDays
-          };
-        } else {
-          // 新单词，使用FSRS初始化
-          fsrsData = initNewCard();
-        }
+      // 使用新的简化算法获取今日学习队列
+      const todayCards = scheduler.getDailyStudyQueue(words, studyRecords);
+      
+      console.log('获取今日学习队列完成，共', todayCards.length, '个卡片');
+      
+      // 转换为学习卡片格式
+      const cards = todayCards.map((wordRecord: any) => {
+        const originalWord = words.find((w: any) => w._id === wordRecord.wordId);
         
         return {
-          _id: word._id,
-          word: word.word,
+          _id: wordRecord.wordId,
+          word: wordRecord.word,
           meanings: [{
-            partOfSpeech: word.pos || 'n.',
-            definition: word.meaning,
-            example: word.example || `Example with ${word.word}`
+            partOfSpeech: originalWord?.pos || 'n.',
+            definition: originalWord?.meaning || 'No definition available',
+            example: originalWord?.example || `Example with ${wordRecord.word}`
           }],
-          pronunciation: word.phonetic || word.word,
-          fsrs: fsrsData,
-          originalWord: word
+          pronunciation: originalWord?.phonetic || wordRecord.word,
+          wordRecord: wordRecord,
+          originalWord: originalWord
         };
       });
       
-      console.log('创建学习卡片完成，共', cards.length, '个卡片');
+      // 统计新词和复习词
+      const newWordsCount = cards.filter(card => card.wordRecord.status === WORD_STATUS.new).length;
+      const reviewWordsCount = cards.length - newWordsCount;
       
       // 初始化学习会话
       const newSession: StudySession = {
@@ -129,13 +114,11 @@ export default function StudyPage() {
         currentIndex: 0,
         totalCards: cards.length,
         completedCards: 0,
-        newCards: cards.filter((card: any) => card.fsrs.status === 'new').length,
-        reviewCards: cards.filter((card: any) => card.fsrs.status === 'review').length,
+        newCards: newWordsCount,
+        reviewCards: reviewWordsCount,
         stats: {
-          again: 0,
-          hard: 0,
-          good: 0,
-          easy: 0
+          known: 0,
+          unknown: 0
         }
       };
       
@@ -157,35 +140,33 @@ export default function StudyPage() {
     }
   };
 
-  const handleRating = async (rating: number) => {
+  const handleRating = async (isKnown: boolean) => {
     if (!currentCard || !session || !user) return;
     
     try {
-      // 使用FSRS算法更新卡片状态
-      const updatedCard = scheduleCard(currentCard.fsrs, rating);
+      // 使用简化算法更新卡片状态
+      const updatedWordRecord = processUserChoice(currentCard.wordRecord, isKnown);
       
       // 保存学习记录到CloudBase
       await wordbookService.saveStudyRecord({
         uid: user.uid,
         wordId: currentCard._id,
         wordbookId: session.wordbookId,
-        difficulty: updatedCard.difficulty,
-        stability: updatedCard.stability,
-        retrievability: updatedCard.retrievability,
-        status: updatedCard.status,
-        due: updatedCard.due,
-        lapses: updatedCard.lapses,
-        reps: updatedCard.reps,
-        elapsedDays: updatedCard.elapsedDays,
-        scheduledDays: updatedCard.scheduledDays,
-        lastReviewed: new Date()
+        stage: updatedWordRecord.stage,
+        nextReview: updatedWordRecord.nextReview,
+        failures: updatedWordRecord.failures,
+        successes: updatedWordRecord.successes,
+        lastReview: updatedWordRecord.lastReview,
+        status: updatedWordRecord.status,
+        createdAt: updatedWordRecord.createdAt
       });
       
       // 更新本地状态
       const newStats = { ...session.stats };
-      const ratingKey = Object.keys(RATINGS).find(key => RATINGS[key] === rating);
-      if (ratingKey && ratingKey in newStats) {
-        (newStats as any)[ratingKey]++;
+      if (isKnown) {
+        newStats.known++;
+      } else {
+        newStats.unknown++;
       }
       
       const newSession = {
@@ -200,21 +181,15 @@ export default function StudyPage() {
       // 移动到下一张卡片
       if (newSession.currentIndex < session.cards.length) {
         const nextCard = session.cards[newSession.currentIndex];
-        nextCard.studyStartTime = Date.now();
         setCurrentCard(nextCard);
-        setShowAnswer(false);
       } else {
         setIsFinished(true);
       }
       
-      console.log('卡片状态更新:', updatedCard);
+      console.log('单词状态更新:', updatedWordRecord);
     } catch (error) {
       console.error('处理评分失败:', error);
     }
-  };
-
-  const handleShowAnswer = () => {
-    setShowAnswer(true);
   };
 
   const handleRestartSession = () => {
@@ -239,101 +214,42 @@ export default function StudyPage() {
 
   if (isFinished) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center py-12">
-            <div className="w-24 h-24 mx-auto mb-8 bg-green-500/20 rounded-full flex items-center justify-center">
-              <div className="text-4xl">🎉</div>
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-4">学习完成！</h1>
-            <p className="text-gray-400 mb-8">
-              恭喜你完成了今天的学习任务
-            </p>
-            
-            {session && (
-              <StudyStats 
-                stats={session.stats}
-                totalCards={session.completedCards}
-                className="mb-8"
-              />
-            )}
-            
-            <div className="flex space-x-4 justify-center">
-              <Button
-                onClick={handleRestartSession}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                再来一轮
-              </Button>
-              <Button
-                onClick={handleBackToWordbooks}
-                variant="outline"
-                className="border-gray-600 text-gray-300 hover:bg-gray-700"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                返回词书
-              </Button>
-            </div>
-          </div>
+      <div className="flex flex-col items-center justify-center h-screen text-center space-y-6 px-6 bg-gray-900 text-white">
+        <h2 className="text-2xl font-semibold tracking-tight">完成！</h2>
+        <div className="text-lg text-gray-400 space-y-2">
+          <p>今日学习完成</p>
+          <p>
+            认识：<span className="text-purple-400">{session?.stats.known || 0}</span> 个<br/>
+            不认识：<span className="text-purple-400">{session?.stats.unknown || 0}</span> 个
+          </p>
+          <p className="text-sm text-gray-500">
+            新词：{session?.newCards || 0} 个，复习：{session?.reviewCards || 0} 个
+          </p>
         </div>
+        <button 
+          onClick={handleRestartSession}
+          className="mt-4 px-6 py-3 rounded-lg text-white font-medium bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition"
+        >
+          再来一次
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      {/* 头部导航 */}
-      <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Button
-              onClick={handleBackToWordbooks}
-              variant="ghost"
-              size="sm"
-              className="text-gray-400 hover:text-white"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              返回
-            </Button>
-            
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-400 hover:text-white"
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 学习进度 */}
-      {session && (
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <StudyProgress
-            current={session.currentIndex}
-            total={session.totalCards}
-            newCards={session.newCards}
-            reviewCards={session.reviewCards}
-          />
-        </div>
+    <div>
+      {currentCard && session && (
+        <StudyCard
+          card={currentCard}
+          showAnswer={false}
+          onShowAnswer={() => {}}
+          onRating={handleRating}
+          scheduler={scheduler}
+          current={session.currentIndex}
+          total={session.totalCards}
+          onBack={handleBackToWordbooks}
+        />
       )}
-
-      {/* 学习卡片 */}
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        {currentCard && (
-          <StudyCard
-            card={currentCard}
-            showAnswer={showAnswer}
-            onShowAnswer={handleShowAnswer}
-            onRating={handleRating}
-            scheduler={scheduler}
-          />
-        )}
-      </div>
     </div>
   );
 }

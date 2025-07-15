@@ -1,248 +1,205 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Volume2, Eye, RotateCcw } from 'lucide-react';
-import { RATINGS, getNextStates, getStudyAdvice } from '../../utils/fsrs';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { Volume2, ArrowLeft, ChevronRight } from 'lucide-react';
 
 interface StudyCardProps {
   card: any;
   showAnswer: boolean;
   onShowAnswer: () => void;
-  onRating: (rating: number) => void;
+  onRating: (isKnown: boolean) => void;
   scheduler: any;
+  current: number;
+  total: number;
+  onBack: () => void;
 }
 
-export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler }: StudyCardProps) {
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [studyAdvice, setStudyAdvice] = useState<any>(null);
+export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler, current, total, onBack }: StudyCardProps) {
+  const [answerRevealed, setAnswerRevealed] = useState(false);
+  const [userChoice, setUserChoice] = useState<boolean | null>(null);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // 重置状态当卡片变化时
   useEffect(() => {
-    if (card && card.fsrs) {
-      try {
-        const advice = getStudyAdvice(card.fsrs);
-        setStudyAdvice(advice);
-      } catch (error) {
-        console.error('获取学习建议失败:', error);
-        setStudyAdvice(null);
-      }
+    setAnswerRevealed(false);
+    setUserChoice(null);
+    setIsPlayingAudio(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
     }
   }, [card]);
 
-  useEffect(() => {
-    setIsFlipped(showAnswer);
-  }, [showAnswer]);
+  const handlePlayAudio = async () => {
+    if (isPlayingAudio) return;
+    
+    setIsPlayingAudio(true);
+    
+    // 优先使用真实音频文件
+    if (card.originalWord?.audioUrl) {
+      try {
+        // 停止之前的音频
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        
+        audioRef.current = new Audio(card.originalWord.audioUrl);
+        audioRef.current.onended = () => setIsPlayingAudio(false);
+        audioRef.current.onerror = () => {
+          console.warn('音频文件加载失败，降级到TTS');
+          fallbackToTTS();
+        };
+        
+        await audioRef.current.play();
+      } catch (error) {
+        console.warn('音频播放失败，降级到TTS');
+        fallbackToTTS();
+      }
+    } else {
+      // 降级到TTS
+      fallbackToTTS();
+    }
+  };
 
-  const handlePlayAudio = () => {
-    if (card.pronunciation) {
-      // 使用Web Speech API播放发音
+  const fallbackToTTS = () => {
+    if (card.word) {
       const utterance = new SpeechSynthesisUtterance(card.word);
       utterance.lang = 'en-US';
       utterance.rate = 0.8;
+      utterance.onend = () => setIsPlayingAudio(false);
+      window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
+    } else {
+      setIsPlayingAudio(false);
     }
   };
 
-  const handleRatingClick = (rating: number) => {
-    onRating(rating);
-    setIsFlipped(false);
+  const handleKnow = () => {
+    setUserChoice(true);
+    setAnswerRevealed(true);
   };
 
-  const getRatingButtonStyle = (rating: number) => {
-    const baseStyle = "flex-1 py-4 px-6 rounded-xl font-semibold transition-all duration-200 transform hover:scale-105 active:scale-95";
-    
-    switch (rating) {
-      case RATINGS.again:
-        return `${baseStyle} bg-red-600 hover:bg-red-700 text-white`;
-      case RATINGS.hard:
-        return `${baseStyle} bg-orange-600 hover:bg-orange-700 text-white`;
-      case RATINGS.good:
-        return `${baseStyle} bg-green-600 hover:bg-green-700 text-white`;
-      case RATINGS.easy:
-        return `${baseStyle} bg-blue-600 hover:bg-blue-700 text-white`;
-      default:
-        return baseStyle;
+  const handleDontKnow = () => {
+    setUserChoice(false);
+    setAnswerRevealed(true);
+  };
+
+  const handleNext = () => {
+    if (userChoice !== null) {
+      onRating(userChoice);
     }
-  };
-
-  const getRatingLabel = (rating: number) => {
-    switch (rating) {
-      case RATINGS.again:
-        return '再来';
-      case RATINGS.hard:
-        return '困难';
-      case RATINGS.good:
-        return '良好';
-      case RATINGS.easy:
-        return '简单';
-      default:
-        return '';
-    }
-  };
-
-  const getIntervalText = (days: number) => {
-    if (days < 1) return '今天';
-    if (days === 1) return '1天';
-    if (days < 30) return `${days}天`;
-    if (days < 365) return `${Math.round(days / 30)}个月`;
-    return `${Math.round(days / 365)}年`;
   };
 
   return (
-    <div className="relative">
-      {/* 卡片状态指示器 */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${
-            card.fsrs.status === 'new' ? 'bg-blue-500' :
-            card.fsrs.status === 'learning' ? 'bg-yellow-500' :
-            card.fsrs.status === 'review' ? 'bg-green-500' :
-            'bg-red-500'
-          }`}></div>
-          <span className="text-sm text-gray-400">
-            {card.fsrs.status === 'new' ? '新单词' :
-             card.fsrs.status === 'learning' ? '学习中' :
-             card.fsrs.status === 'review' ? '复习' :
-             '重新学习'}
-          </span>
+    <div className="flex flex-col min-h-screen text-white bg-gray-900 pt-10 pr-6 pb-10 pl-6">
+      {/* Header */}
+      <header className="flex items-center justify-between mb-10">
+        <button 
+          onClick={onBack}
+          aria-label="返回上一页" 
+          className="group w-10 h-10 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 transition focus:outline-none focus:ring-2 focus:ring-purple-500"
+        >
+          <ArrowLeft className="w-5 h-5 stroke-current transition-transform group-hover:-translate-x-0.5" />
+          <span className="sr-only">返回上一页</span>
+        </button>
+
+        <span className="text-sm text-gray-400">{current + 1} / {total}</span>
+      </header>
+
+      {/* Word Card */}
+      <section className="flex-1 flex flex-col text-center space-y-6 items-center justify-center">
+        <div>
+          <h2 className="text-4xl tracking-tight font-semibold mb-2">{card.word}</h2>
+          <p className="text-lg text-purple-400">
+            {card.pronunciation ? `/${card.pronunciation}/` : ''}
+          </p>
         </div>
         
-        {studyAdvice && (
-          <div className="text-sm text-gray-400">
-            难度: {studyAdvice.difficulty}
-            {studyAdvice.retrievability && (
-              <span className="ml-2">
-                记忆率: {studyAdvice.retrievability}%
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 主卡片 */}
-      <div className="relative h-96 mb-8 perspective-1000">
-        <motion.div
-          className="relative w-full h-full"
-          initial={false}
-          animate={{ rotateY: isFlipped ? 180 : 0 }}
-          transition={{ duration: 0.6, ease: 'easeInOut' }}
-          style={{ transformStyle: 'preserve-3d' }}
+        <button 
+          onClick={handlePlayAudio}
+          disabled={isPlayingAudio}
+          aria-label="读音" 
+          className={`w-14 h-14 rounded-full flex items-center justify-center transition ${
+            isPlayingAudio 
+              ? 'bg-purple-600 animate-pulse' 
+              : 'bg-gray-800 hover:bg-gray-700'
+          }`}
         >
-          {/* 正面 - 单词 */}
-          <Card className="absolute inset-0 glass-dark border-gray-700/50 backface-hidden">
-            <CardContent className="h-full flex flex-col items-center justify-center p-8">
-              <div className="text-center">
-                <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-                  {card.word}
-                </h1>
-                
-                {card.pronunciation && (
-                  <div className="flex items-center justify-center mb-6">
-                    <span className="text-gray-400 mr-2">/{card.pronunciation}/</span>
-                    <Button
-                      onClick={handlePlayAudio}
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-400 hover:text-blue-300"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
-                
-                <div className="text-gray-500 text-sm mb-8">
-                  点击下方按钮查看释义
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <Volume2 className="w-6 h-6 stroke-current" />
+        </button>
 
-          {/* 背面 - 释义 */}
-          <Card className="absolute inset-0 glass-dark border-gray-700/50 backface-hidden rotate-y-180">
-            <CardContent className="h-full flex flex-col justify-center p-8">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-white mb-4">{card.word}</h2>
-                
-                {card.pronunciation && (
-                  <div className="flex items-center justify-center mb-4">
-                    <span className="text-gray-400 mr-2">/{card.pronunciation}/</span>
-                    <Button
-                      onClick={handlePlayAudio}
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-400 hover:text-blue-300"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-4">
-                {card.meanings && card.meanings.map((meaning, index) => (
-                  <div key={index} className="text-left">
-                    <div className="flex items-start space-x-2">
-                      <span className="text-blue-400 font-medium text-sm">
-                        {meaning.partOfSpeech}
-                      </span>
-                      <span className="text-white flex-1">
-                        {meaning.definition}
-                      </span>
-                    </div>
-                    {meaning.example && (
-                      <div className="mt-2 ml-12 text-gray-400 text-sm italic">
-                        {meaning.example}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* 操作按钮 */}
-      <div className="space-y-4">
-        {!showAnswer ? (
-          <Button
-            onClick={onShowAnswer}
-            className="w-full py-4 text-lg bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
-          >
-            <Eye className="w-5 h-5 mr-2" />
-            查看释义
-          </Button>
-        ) : (
-          <div className="space-y-4">
-            <div className="text-center text-gray-400 text-sm mb-4">
-              根据你的记忆程度选择难度
+        {/* 答案详情 - 只在answerRevealed为true时显示 */}
+        {answerRevealed && (
+          <div className="mt-8 p-6 bg-gray-800 rounded-lg max-w-md w-full text-left space-y-4">
+            <div className="border-b border-gray-700 pb-4">
+              <h3 className="text-lg font-semibold text-purple-400 mb-2">单词详情</h3>
             </div>
             
-            <div className="grid grid-cols-2 gap-3">
-              {Object.entries(RATINGS).map(([key, rating]) => (
-                <Button
-                  key={key}
-                  onClick={() => handleRatingClick(rating)}
-                  className={getRatingButtonStyle(rating)}
-                >
-                  <div className="text-center">
-                    <div className="font-semibold">{getRatingLabel(rating)}</div>
-                    {studyAdvice && studyAdvice.suggestions[key] && (
-                      <div className="text-xs opacity-80 mt-1">
-                        {getIntervalText(studyAdvice.suggestions[key].interval)}
-                      </div>
-                    )}
-                  </div>
-                </Button>
-              ))}
-            </div>
+            {/* 词性 */}
+            {card.meanings?.[0]?.partOfSpeech && (
+              <div>
+                <span className="text-sm text-gray-400">词性：</span>
+                <span className="ml-2 text-orange-400">{card.meanings[0].partOfSpeech}</span>
+              </div>
+            )}
             
-            <div className="text-center text-xs text-gray-500 mt-4">
-              再来=忘记了 • 困难=想起来但很困难 • 良好=正常想起 • 简单=很容易想起
+            {/* 中文释义 */}
+            {card.meanings?.[0]?.definition && (
+              <div>
+                <span className="text-sm text-gray-400">释义：</span>
+                <p className="mt-1 text-white">{card.meanings[0].definition}</p>
+              </div>
+            )}
+            
+            {/* 例句 */}
+            {card.meanings?.[0]?.example && (
+              <div>
+                <span className="text-sm text-gray-400">例句：</span>
+                <p className="mt-1 text-gray-300 italic">{card.meanings[0].example}</p>
+              </div>
+            )}
+            
+            {/* 用户选择显示 */}
+            <div className="pt-4 border-t border-gray-700">
+              <span className="text-sm text-gray-400">你的选择：</span>
+              <span className={`ml-2 font-medium ${
+                userChoice ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {userChoice ? '认识' : '不认识'}
+              </span>
             </div>
           </div>
         )}
-      </div>
+      </section>
+
+      {/* Action Buttons */}
+      <footer className="space-y-4">
+        {!answerRevealed ? (
+          // 学习阶段按钮
+          <div className="grid grid-cols-2 gap-4">
+            <button 
+              onClick={handleKnow}
+              className="py-3 rounded-lg text-white font-medium bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 transition"
+            >
+              认识
+            </button>
+            <button 
+              onClick={handleDontKnow}
+              className="py-3 rounded-lg text-white font-medium bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 transition"
+            >
+              不认识
+            </button>
+          </div>
+        ) : (
+          // 答案阶段按钮
+          <button 
+            onClick={handleNext}
+            className="w-full py-3 rounded-lg text-white font-medium bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition flex items-center justify-center space-x-2"
+          >
+            <span>下一个</span>
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
+      </footer>
     </div>
   );
 }

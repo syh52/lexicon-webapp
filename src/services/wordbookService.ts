@@ -28,16 +28,12 @@ export interface StudyRecord {
   uid: string;
   wordId: string;
   wordbookId: string;
-  difficulty: number;
-  stability: number;
-  retrievability: number;
-  status: 'new' | 'learning' | 'review';
-  due: Date;
-  lapses: number;
-  reps: number;
-  elapsedDays: number;
-  scheduledDays: number;
-  lastReviewed?: Date;
+  stage: number;
+  nextReview: Date;
+  failures: number;
+  successes: number;
+  lastReview?: Date;
+  status: 'new' | 'learning' | 'reviewing' | 'mastered';
   createdAt?: Date;
   updatedAt?: Date;
 }
