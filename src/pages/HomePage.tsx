@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, MessageCircle, CheckCircle, User, Upload, Settings, Zap } from "lucide-react";
+import WelcomeHeroCard from '../components/WelcomeHeroCard';
 
 // 这是原项目中最满意的首页设计示例
 // 展示了Glass Morphism风格和现代化的交互设计
@@ -11,8 +12,7 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   const handleDailyCheckIn = () => {
-    console.log('签到功能');
-  };
+    };
 
   const navigateToLogin = () => {
     navigate('/login');
@@ -21,8 +21,7 @@ export default function HomePage() {
   const handleAnonymousLogin = async () => {
     try {
       await anonymousLogin();
-      console.log('匿名登录成功');
-    } catch (error) {
+      } catch (error) {
       console.error('匿名登录失败:', error);
     }
   };
@@ -36,11 +35,10 @@ export default function HomePage() {
   };
 
   const navigateToQuizzes = () => {
-    console.log('跳转到测验页');
-  };
+    };
 
   const navigateToUpload = () => {
-    console.log('跳转到上传页');
+    navigate('/upload');
   };
 
   const navigateToManage = () => {
@@ -55,40 +53,23 @@ export default function HomePage() {
       </div>
     );
   }
+
+  // 如果加载完成但没有内容，显示一个fallback
+  if (!isLoading && !user && !isLoggedIn) {
+    }
   
   return (
     <div className="space-y-6 sm:space-y-8 md:space-y-10 py-4 sm:py-6">
-      {/* Featured Hero Section */}
-      <div className="relative perspective-element transform transition-transform duration-200 ease-out animate-blur-in animate-delay-200">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-3xl blur-sm"></div>
-        <div className="relative glass-card rounded-3xl p-6 sm:p-8 md:p-10">
-          <div className="text-center">
-            <div className="text-xs sm:text-sm font-medium text-purple-400 mb-3 sm:mb-4 tracking-wide uppercase">欢迎来到Lexicon</div>
-            <div className="text-lg sm:text-xl md:text-2xl font-semibold text-white tracking-tight font-inter mb-4 sm:mb-6 leading-relaxed">
-              "Ye are the salt of the earth: but if the salt have lost his savour, wherewith shall it be salted?"
-            </div>
-            <p className="text-xs sm:text-sm text-gray-400 mb-6 sm:mb-8 italic">
-              "你们是世上的盐。盐若失了味，怎能叫它再咸呢？"—— 《马太福音》5:13
-            </p>
-            
-            {!isLoggedIn ? (
-              <button 
-                onClick={navigateToLogin}
-                className="w-full sm:w-auto sm:px-12 gradient-primary text-white py-3.5 px-6 rounded-2xl text-sm sm:text-base font-medium modern-focus cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
-              >
-                开始学习之旅
-              </button>
-            ) : (
-              <button 
-                onClick={handleDailyCheckIn}
-                className="w-full sm:w-auto sm:px-12 gradient-primary text-white py-3.5 px-6 rounded-2xl text-sm sm:text-base font-medium modern-focus cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg"
-              >
-                今日签到获取积分
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Featured Hero Section - 使用可复用的WelcomeHeroCard组件 */}
+      <WelcomeHeroCard
+        subtitle="欢迎来到LEXICON"
+        title="Ye are the salt of the earth: but if the salt have lost his savour, wherewith shall it be salted?"
+        description="你们是世上的盐。盐若失了味，怎能叫它再咸呢？ —— 《马太福音》5:13"
+        buttonText={!isLoggedIn ? "开始学习之旅" : "今日签到获取积分"}
+        onButtonClick={!isLoggedIn ? navigateToLogin : handleDailyCheckIn}
+        enableAnimation={true}
+        animationDelay={200}
+      />
 
       {/* Core Modules */}
       <div>

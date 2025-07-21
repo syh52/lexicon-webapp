@@ -41,6 +41,21 @@ export const init = (config = {}) => {
  */
 export const app = init();
 
+// 缓存auth实例和登录状态，避免重复创建和登录
+let authInstance = null;
+let isLoggedIn = false;
+let loginPromise = null;
+
+/**
+ * 获取auth实例（单例模式）
+ */
+export const getAuth = () => {
+  if (!authInstance) {
+    authInstance = app.auth();
+  }
+  return authInstance;
+};
+
 /**
  * 检查环境配置是否有效
  */
@@ -63,7 +78,7 @@ export const checkEnvironment = () => {
  */
 export const getLoginState = async () => {
   try {
-    const auth = app.auth();
+    const auth = getAuth();
     return await auth.getLoginState();
   } catch (error) {
     console.error('获取登录状态失败:', error);
@@ -77,7 +92,7 @@ export const getLoginState = async () => {
  */
 export const signInAnonymously = async () => {
   try {
-    const auth = app.auth();
+    const auth = getAuth();
     const loginState = await auth.signInAnonymously();
     console.log('匿名登录成功');
     return loginState;
@@ -88,18 +103,41 @@ export const signInAnonymously = async () => {
 };
 
 /**
- * 确保已登录（如未登录则执行匿名登录）
+ * 确保已登录（如未登录则执行匿名登录）- 优化版本
  * @returns {Promise<object>} 登录状态
  */
 export const ensureLogin = async () => {
-  let loginState = await getLoginState();
-  
-  if (!loginState || !loginState.isLoggedIn) {
-    console.log('用户未登录，执行匿名登录...');
-    loginState = await signInAnonymously();
+  // 如果已经登录，直接返回
+  if (isLoggedIn) {
+    return { isLoggedIn: true };
   }
   
-  return loginState;
+  // 如果正在登录，等待现有的登录过程
+  if (loginPromise) {
+    return await loginPromise;
+  }
+  
+  // 开始登录过程
+  loginPromise = (async () => {
+    try {
+      let loginState = await getLoginState();
+      
+      if (!loginState || !loginState.isLoggedIn) {
+        console.log('用户未登录，执行匿名登录...');
+        loginState = await signInAnonymously();
+      }
+      
+      isLoggedIn = true;
+      return loginState;
+    } catch (error) {
+      console.error('登录失败:', error);
+      throw error;
+    } finally {
+      loginPromise = null;
+    }
+  })();
+  
+  return await loginPromise;
 };
 
 // 默认导出
@@ -109,6 +147,7 @@ export default {
   checkEnvironment,
   isValidEnvId,
   CLIENT_ID,
+  getAuth,
   getLoginState,
   signInAnonymously,
   ensureLogin

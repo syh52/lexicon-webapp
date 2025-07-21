@@ -1,12 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { app, ensureLogin, getLoginState } from '../utils/cloudbase';
+import { User as UserType, ApiResponse } from '../types';
 
-interface User {
-  uid: string; // CloudBase 用户 ID
-  displayName: string;
-  username: string; // 用户名（登录用）
-  email: string; // 邮箱地址
-  avatar?: string;
+interface User extends UserType {
   level: number;
   totalWords: number;
   studiedWords: number;
@@ -61,15 +57,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const userData = JSON.parse(savedUser);
           setUser(userData);
           setIsLoggedIn(true);
-          console.log('从本地存储恢复用户状态');
-        } catch (parseError) {
+          } catch (parseError) {
           console.error('解析本地用户信息失败:', parseError);
           localStorage.removeItem('lexicon_user');
           setUser(null);
           setIsLoggedIn(false);
         }
       } else {
-        console.log('用户未登录');
         setUser(null);
         setIsLoggedIn(false);
       }
@@ -78,23 +72,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setIsLoggedIn(false);
     } finally {
+      // 确保loading状态始终被设置为false
       setIsLoading(false);
     }
   };
-
-
 
   // 邮箱+密码登录 - 使用云函数验证
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      console.log('使用云函数登录:', email);
-      
       // 先确保匿名登录以获取云函数调用权限
       const auth = app.auth();
       const loginState = await auth.getLoginState();
       if (!loginState || !loginState.isLoggedIn) {
-        console.log('先进行匿名登录以获取云函数调用权限');
         await auth.signInAnonymously();
       }
       
@@ -130,8 +120,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // 将用户信息保存到本地存储
         localStorage.setItem('lexicon_user', JSON.stringify(userData));
         
-        console.log('云函数登录成功');
-      } else {
+        } else {
         throw new Error(loginResult.result?.error || '登录失败');
       }
     } catch (error) {
@@ -146,13 +135,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (email: string, password: string, displayName?: string) => {
     setIsLoading(true);
     try {
-      console.log('开始注册:', email);
-      
       // 确保已登录（匿名登录）以便调用云函数
       const auth = app.auth();
       const loginState = await auth.getLoginState();
       if (!loginState || !loginState.isLoggedIn) {
-        console.log('先进行匿名登录以获取云函数调用权限');
         await auth.signInAnonymously();
       }
       
@@ -169,7 +155,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       
       if (registerResult.result?.success) {
-        console.log('云函数注册成功，创建本地用户状态');
         // 注册成功，创建本地用户状态
         const userInfo = registerResult.result.data;
         const userData: User = {
@@ -192,8 +177,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // 将用户信息保存到本地存储
         localStorage.setItem('lexicon_user', JSON.stringify(userData));
         
-        console.log('注册成功，用户状态已设置');
-      } else {
+        } else {
         throw new Error(registerResult.result?.error || '注册失败，请重试');
       }
     } catch (error) {
@@ -204,7 +188,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-
   const logout = async () => {
     try {
       // 清除本地存储
@@ -214,8 +197,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setIsLoggedIn(false);
       
-      console.log('登出成功');
-    } catch (error) {
+      } catch (error) {
       console.error('登出失败:', error);
       // 即使出错，也要清除本地状态
       localStorage.removeItem('lexicon_user');
@@ -254,8 +236,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // 将用户信息保存到本地存储
         localStorage.setItem('lexicon_user', JSON.stringify(userData));
         
-        console.log('匿名登录成功');
-      }
+        }
     } catch (error) {
       console.error('匿名登录失败:', error);
       throw error;
@@ -293,8 +274,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const updatedUser = { ...user, ...userInfo };
         setUser(updatedUser);
         
-        console.log('用户信息更新成功');
-      } else {
+        } else {
         throw new Error(result.result?.error || '更新用户信息失败');
       }
     } catch (error) {

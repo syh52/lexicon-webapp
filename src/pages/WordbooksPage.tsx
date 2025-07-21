@@ -22,6 +22,7 @@ interface Wordbook {
 export default function WordbooksPage() {
   const [wordbooks, setWordbooks] = useState<Wordbook[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -29,18 +30,40 @@ export default function WordbooksPage() {
     loadWordbooks();
   }, []);
 
+  // 监听用户状态变化，确保登录状态变化时重新加载数据
+  useEffect(() => {
+    if (user) {
+      loadWordbooks();
+    }
+  }, [user]);
+
+  // 监听页面可见性变化，当页面重新获得焦点时刷新数据
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user) {
+        loadWordbooks();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
+
   const loadWordbooks = async () => {
     try {
       setLoading(true);
-      console.log('开始加载词书...');
+      setError(null);
+      // 如果用户未登录，直接返回空数组
+      if (!user) {
+        setWordbooks([]);
+        return;
+      }
       
       // 调用云函数获取真实数据
       const result = await app.callFunction({
         name: 'getWordbooks',
         data: {}
       });
-      
-      console.log('云函数返回结果:', result);
       
       if (result.result?.success && result.result?.data?.wordbooks) {
         const rawWordbooks = result.result.data.wordbooks;
@@ -66,14 +89,17 @@ export default function WordbooksPage() {
           };
         });
         
-        console.log('处理后的词书数据:', wordbooksWithProgress);
         setWordbooks(wordbooksWithProgress);
       } else {
-        console.error('云函数返回错误:', result.result?.error);
+        const errorMsg = result.result?.error || '获取词书数据失败';
+        console.error('云函数返回错误:', errorMsg);
+        setError(errorMsg);
         setWordbooks([]);
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '加载词书失败';
       console.error('加载词书失败:', error);
+      setError(errorMsg);
       setWordbooks([]);
     } finally {
       setLoading(false);
@@ -95,13 +121,38 @@ export default function WordbooksPage() {
     );
   }
 
-  if (wordbooks.length === 0) {
+  // 显示错误状态
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <BookOpen className="mx-auto h-12 w-12 text-red-400" />
+          <h3 className="mt-2 text-sm font-medium text-white">加载失败</h3>
+          <p className="mt-1 text-sm text-gray-400">{error}</p>
+          <Button 
+            onClick={loadWordbooks}
+            className="mt-4 bg-blue-600 hover:bg-blue-700"
+          >
+            重试
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (wordbooks.length === 0 && !loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-white">暂无词书</h3>
           <p className="mt-1 text-sm text-gray-400">管理员尚未添加词书内容</p>
+          <Button 
+            onClick={loadWordbooks}
+            className="mt-4 bg-blue-600 hover:bg-blue-700"
+          >
+            刷新
+          </Button>
         </div>
       </div>
     );

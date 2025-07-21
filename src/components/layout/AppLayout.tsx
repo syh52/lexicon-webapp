@@ -35,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PerspectiveProvider>
       {/* Main Content Container - 桌面端使用更宽的布局 */}
-      <div className="w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-screen-xl mx-auto bg-gray-900 min-h-screen relative overflow-hidden perspective-1000">
+      <div className="w-full bg-gray-900 min-h-screen relative overflow-hidden perspective-1000">
         {/* Simplified Status Bar - Empty spacer */}
         <div className="h-[34px] relative z-50"></div>
         

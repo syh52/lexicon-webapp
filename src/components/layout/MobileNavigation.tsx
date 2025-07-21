@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, MessageSquare, User } from 'lucide-react';
+import { Home, BookOpen, MessageSquare, User, Settings } from 'lucide-react';
 
 export default function MobileNavigation() {
   const location = useLocation();
@@ -20,10 +20,10 @@ export default function MobileNavigation() {
       isActive: pathname.startsWith('/wordbooks'),
     },
     {
-      label: '智能对话',
-      href: '/chat',
-      icon: MessageSquare,
-      isActive: pathname.startsWith('/chat'),
+      label: '设置',
+      href: '/settings',
+      icon: Settings,
+      isActive: pathname.startsWith('/settings'),
     },
     {
       label: '我的',

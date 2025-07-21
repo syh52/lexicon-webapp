@@ -1,0 +1,11 @@
+{
+  "name": "upload-wordbook",
+  "version": "1.0.0",
+  "description": "批量上传词书云函数",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.4.1"
+  },
+  "author": "",
+  "license": "MIT"
+}

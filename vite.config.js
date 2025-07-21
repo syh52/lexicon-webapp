@@ -15,19 +15,54 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
-    // 优化静态托管的构建配置
+    // 优化构建配置
+    target: 'es2015',
+    minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          ui: ['framer-motion', '@heroicons/react', 'lucide-react']
+        chunkFileNames: 'js/[name]-[hash].js',
+        entryFileNames: 'js/[name]-[hash].js',
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name.split('.');
+          const ext = info[info.length - 1];
+          if (/\.(mp4|webm|ogg|mp3|wav|flac|aac)$/.test(assetInfo.name)) {
+            return `media/[name]-[hash].${ext}`;
+          }
+          if (/\.(png|jpe?g|gif|svg|webp|ico)$/.test(assetInfo.name)) {
+            return `img/[name]-[hash].${ext}`;
+          }
+          if (/\.(woff2?|eot|ttf|otf)$/.test(assetInfo.name)) {
+            return `fonts/[name]-[hash].${ext}`;
+          }
+          return `assets/[name]-[hash].${ext}`;
         }
       }
-    }
+    },
+    // 性能优化
+    chunkSizeWarningLimit: 1000,
+    reportCompressedSize: false
   },
   server: {
     host: '127.0.0.1',  // 开发环境使用IP地址
-    port: 5173
+    port: 5173,
+    open: true,
+    cors: true
+  },
+  // 优化依赖处理
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@cloudbase/js-sdk',
+      'framer-motion',
+      'lucide-react'
+    ],
+    exclude: ['@cloudbase/cli']
+  },
+  // 定义全局变量
+  define: {
+    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
+    __PROD__: JSON.stringify(process.env.NODE_ENV === 'production')
   }
 })

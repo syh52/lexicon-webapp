@@ -212,7 +212,6 @@ export default function AuthPage() {
       return;
     }
 
-
     try {
       await register(formData.email, formData.password, formData.username);
       setSuccess('注册成功！正在跳转...');
@@ -479,7 +478,6 @@ export default function AuthPage() {
                   </p>
                 )}
               </div>
-
 
               {/* 注册按钮 */}
               <button

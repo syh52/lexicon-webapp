@@ -202,9 +202,143 @@
 }
 ```
 
-## 6. 初始数据说明
+## 6. 用户设置集合 (user_settings)
+
+存储用户的个人学习偏好设置。
+
+```javascript
+{
+  _id: ObjectId,
+  userId: String,              // 用户ID
+  
+  // 每日学习目标设置
+  dailyNewWords: Number,       // 每日新单词数量 (默认: 16)
+  dailyReviewWords: Number,    // 每日复习单词数量 (默认: 48)
+  dailyTarget: Number,         // 每日总目标 (默认: 64)
+  
+  // 学习偏好设置
+  studyMode: String,           // 学习模式: 'standard', 'intensive', 'relaxed'
+  enableVoice: Boolean,        // 是否启用语音播放 (默认: true)
+  autoNext: Boolean,           // 是否自动进入下一个单词 (默认: false)
+  
+  // 提醒设置
+  enableReminder: Boolean,     // 是否启用学习提醒 (默认: true)
+  reminderTime: String,        // 提醒时间 (格式: "HH:MM")
+  
+  // 元数据
+  createdAt: Date,
+  updatedAt: Date,
+  
+  // 索引
+  indexes: [
+    { userId: 1 }
+  ]
+}
+```
+
+## 7. 每日学习计划集合 (daily_study_plans)
+
+存储每日的学习计划和进度信息。
+
+```javascript
+{
+  _id: ObjectId,
+  userId: String,              // 用户ID
+  wordbookId: String,          // 词书ID
+  
+  // 日期信息
+  date: String,                // 日期 (格式: "YYYY-MM-DD")
+  
+  // 学习计划
+  plannedWords: [String],      // 计划学习的单词ID列表
+  totalCount: Number,          // 总计划单词数
+  newWordsCount: Number,       // 新单词数量
+  reviewWordsCount: Number,    // 复习单词数量
+  
+  // 学习进度
+  completedWords: [String],    // 已完成的单词ID列表
+  currentIndex: Number,        // 当前学习进度索引
+  completedCount: Number,      // 已完成数量
+  
+  // 学习统计
+  stats: {
+    knownCount: Number,        // 认识的单词数
+    unknownCount: Number,      // 不认识的单词数
+    studyTime: Number,         // 总学习时间(秒)
+    accuracy: Number           // 准确率
+  },
+  
+  // 状态信息
+  isCompleted: Boolean,        // 是否完成今日目标
+  completedAt: Date,           // 完成时间
+  
+  // 元数据
+  createdAt: Date,
+  updatedAt: Date,
+  
+  // 索引
+  indexes: [
+    { userId: 1, date: -1 },
+    { userId: 1, wordbookId: 1, date: -1 },
+    { userId: 1, date: -1, isCompleted: 1 }
+  ]
+}
+```
+
+## 8. 学习会话集合 (study_sessions)
+
+存储学习会话的详细信息（扩展现有结构）。
+
+```javascript
+{
+  _id: ObjectId,
+  userId: String,              // 用户ID
+  wordbookId: String,          // 词书ID
+  planId: String,              // 关联的每日计划ID
+  
+  // 会话信息
+  startTime: Date,             // 开始时间
+  endTime: Date,               // 结束时间
+  duration: Number,            // 持续时间(毫秒)
+  
+  // 学习统计
+  stats: {
+    totalCards: Number,        // 总学习卡片数
+    newCards: Number,          // 新卡片数
+    reviewCards: Number,       // 复习卡片数
+    againCount: Number,        // Again次数
+    hardCount: Number,         // Hard次数
+    goodCount: Number,         // Good次数
+    easyCount: Number,         // Easy次数
+    accuracy: Number           // 准确率
+  },
+  
+  // 会话状态
+  status: String,              // 会话状态: 'active', 'paused', 'completed', 'interrupted'
+  resumeData: {                // 用于恢复会话的数据
+    currentIndex: Number,
+    remainingWords: [String],
+    completedWords: [String]
+  },
+  
+  // 元数据
+  createdAt: Date,
+  updatedAt: Date,
+  
+  // 索引
+  indexes: [
+    { userId: 1, startTime: -1 },
+    { userId: 1, wordbookId: 1, startTime: -1 },
+    { userId: 1, planId: 1, startTime: -1 }
+  ]
+}
+```
+
+## 9. 初始数据说明
 
 - 新用户会使用默认的FSRS参数
 - 新卡片的初始状态为'new'，difficulty和stability使用默认值
 - 需要导入基础单词数据到cards集合
 - 需要为每个词书创建默认的FSRS参数配置
+- 新用户会创建默认的学习设置（dailyNewWords: 16, dailyReviewWords: 48）
+- 每日学习计划会在用户首次访问时自动生成
