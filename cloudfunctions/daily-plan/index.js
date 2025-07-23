@@ -1,10 +1,11 @@
-const cloud = require('wx-server-sdk');
+const cloudbase = require('@cloudbase/node-sdk');
 
-cloud.init({
-  env: cloud.DYNAMIC_CURRENT_ENV
+// 初始化CloudBase
+const app = cloudbase.init({
+  env: cloudbase.SYMBOL_CURRENT_ENV
 });
 
-const db = cloud.database();
+const db = app.database();
 
 // 艾宾浩斯遗忘曲线间隔（天）
 const REVIEW_INTERVALS = [1, 2, 4, 7, 15, 30, 60];
@@ -296,7 +297,7 @@ async function createDailyPlan(userId, wordbookId, date) {
   }
   
   // 获取用户设置
-  const userSettingsResult = await cloud.callFunction({
+  const userSettingsResult = await app.callFunction({
     name: 'user-settings',
     data: { action: 'get', userId }
   });
@@ -308,7 +309,7 @@ async function createDailyPlan(userId, wordbookId, date) {
   const userSettings = userSettingsResult.result.data;
   
   // 获取单词数据
-  const wordsResult = await cloud.callFunction({
+  const wordsResult = await app.callFunction({
     name: 'getWordsByWordbook',
     data: { wordbookId, limit: 1000 }
   });

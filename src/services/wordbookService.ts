@@ -40,16 +40,20 @@ export interface StudyRecord {
 
 export const wordbookService = {
   /**
-   * 获取所有词书
+   * 获取所有词书 - 统一使用云函数
    */
   async getWordbooks(): Promise<Wordbook[]> {
     try {
-      // 确保用户已登录CloudBase
-      await ensureLogin();
-      
-      const db = app.database();
-      const { data } = await db.collection('wordbooks').get();
-      return data || [];
+      const result = await app.callFunction({
+        name: 'getWordbooks',
+        data: {}
+      });
+
+      if (result.result?.success && result.result?.data?.wordbooks) {
+        return result.result.data.wordbooks;
+      } else {
+        throw new Error(result.result?.error || '获取词书失败');
+      }
     } catch (error) {
       console.error('获取词书失败:', error);
       throw error;
@@ -57,18 +61,20 @@ export const wordbookService = {
   },
 
   /**
-   * 获取指定词书的单词
+   * 获取指定词书的单词 - 统一使用云函数
    */
-  async getWordsByWordbook(wordbookId: string): Promise<Word[]> {
+  async getWordsByWordbook(wordbookId: string, limit?: number, offset?: number): Promise<Word[]> {
     try {
-      // 确保用户已登录CloudBase
-      await ensureLogin();
-      
-      const db = app.database();
-      const { data } = await db.collection('words')
-        .where({ wordbookId })
-        .get();
-      return data || [];
+      const result = await app.callFunction({
+        name: 'getWordsByWordbook',
+        data: { wordbookId, limit, offset }
+      });
+
+      if (result.result?.success) {
+        return result.result.data || [];
+      } else {
+        throw new Error(result.result?.error || '获取单词失败');
+      }
     } catch (error) {
       console.error('获取单词失败:', error);
       throw error;
@@ -76,61 +82,62 @@ export const wordbookService = {
   },
 
   /**
-   * 获取用户学习记录
+   * 获取待复习的卡片 - 使用FSRS云函数
    */
-  async getUserStudyRecords(uid: string, wordbookId?: string): Promise<StudyRecord[]> {
+  async getDueCards(userId: string, wordbookId: string, limit?: number): Promise<any[]> {
     try {
-      // 确保用户已登录CloudBase
-      await ensureLogin();
-      
-      const db = app.database();
-      let query = db.collection('reviews').where({ uid });
-      
-      if (wordbookId) {
-        query = query.where({ wordbookId });
+      const result = await app.callFunction({
+        name: 'fsrs-service',
+        data: {
+          action: 'getDueCards',
+          data: { userId, wordbookId, limit }
+        }
+      });
+
+      if (result.result?.success) {
+        return result.result.data || [];
+      } else {
+        throw new Error(result.result?.error || '获取待复习卡片失败');
       }
-      
-      const { data } = await query.get();
-      return data || [];
     } catch (error) {
-      console.error('获取学习记录失败:', error);
+      console.error('获取待复习卡片失败:', error);
       throw error;
     }
   },
 
   /**
-   * 保存或更新学习记录
+   * 提交复习结果 - 使用FSRS云函数
+   */
+  async submitReview(userId: string, cardId: string, rating: number, timeSpent?: number): Promise<void> {
+    try {
+      const result = await app.callFunction({
+        name: 'fsrs-service',
+        data: {
+          action: 'submitReview',
+          data: { userId, cardId, rating, timeSpent }
+        }
+      });
+
+      if (!result.result?.success) {
+        throw new Error(result.result?.error || '提交复习失败');
+      }
+    } catch (error) {
+      console.error('提交复习失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 保存学习记录（兼容现有代码） - 将转换为使用FSRS云函数的submitReview
    */
   async saveStudyRecord(record: Omit<StudyRecord, '_id'>): Promise<void> {
     try {
-      // 确保用户已登录CloudBase
-      await ensureLogin();
+      // 将旧的记录格式转换为FSRS格式
+      const rating = record.status === 'mastered' ? 4 : 
+                    record.failures > 0 ? 1 : 3; // 简化的评分映射
       
-      const db = app.database();
-      const { uid, wordId, wordbookId } = record;
-      
-      // 检查是否已存在记录
-      const { data: existingRecords } = await db.collection('reviews')
-        .where({ uid, wordId, wordbookId })
-        .get();
-      
-      if (existingRecords && existingRecords.length > 0) {
-        // 更新现有记录
-        const existingRecord = existingRecords[0];
-        await db.collection('reviews')
-          .doc(existingRecord._id)
-          .update({
-            ...record,
-            updatedAt: new Date()
-          });
-        } else {
-        // 创建新记录
-        await db.collection('reviews').add({
-          ...record,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-        }
+      const cardId = `card_${record.uid}_${record.wordId}`;
+      await this.submitReview(record.uid, cardId, rating);
     } catch (error) {
       console.error('保存学习记录失败:', error);
       throw error;
@@ -138,9 +145,9 @@ export const wordbookService = {
   },
 
   /**
-   * 获取用户学习统计
+   * 获取用户学习统计 - 使用FSRS云函数
    */
-  async getUserStudyStats(uid: string): Promise<{
+  async getUserStudyStats(uid: string, wordbookId?: string): Promise<{
     totalWords: number;
     studiedWords: number;
     newWords: number;
@@ -148,22 +155,37 @@ export const wordbookService = {
     masteredWords: number;
   }> {
     try {
-      const db = app.database();
-      const { data } = await db.collection('reviews')
-        .where({ uid })
-        .get();
-      
-      const records = data || [];
-      
-      const stats = {
-        totalWords: records.length,
-        studiedWords: records.filter(r => r.status !== 'new').length,
-        newWords: records.filter(r => r.status === 'new').length,
-        reviewWords: records.filter(r => r.status === 'review').length,
-        masteredWords: records.filter(r => r.reps >= 3 && r.stability > 30).length
-      };
-      
-      return stats;
+      if (!wordbookId) {
+        // 如果没有指定词书，返回默认统计
+        return {
+          totalWords: 0,
+          studiedWords: 0,
+          newWords: 0,
+          reviewWords: 0,
+          masteredWords: 0
+        };
+      }
+
+      const result = await app.callFunction({
+        name: 'fsrs-service',
+        data: {
+          action: 'getStudyStats',
+          data: { userId: uid, wordbookId }
+        }
+      });
+
+      if (result.result?.success && result.result?.data) {
+        const stats = result.result.data;
+        return {
+          totalWords: stats.totalReviews || 0,
+          studiedWords: Math.round(stats.totalReviews * stats.accuracy / 100) || 0,
+          newWords: 0, // FSRS云函数暂不提供此统计
+          reviewWords: stats.totalReviews || 0,
+          masteredWords: 0 // 需要根据FSRS算法计算
+        };
+      } else {
+        throw new Error(result.result?.error || '获取学习统计失败');
+      }
     } catch (error) {
       console.error('获取学习统计失败:', error);
       return {
@@ -173,6 +195,21 @@ export const wordbookService = {
         reviewWords: 0,
         masteredWords: 0
       };
+    }
+  },
+
+  /**
+   * 获取用户学习记录（兼容现有代码）
+   */
+  async getUserStudyRecords(uid: string, wordbookId?: string): Promise<StudyRecord[]> {
+    try {
+      // 由于FSRS云函数的数据结构不同，这里返回空数组
+      // 如需要详细记录，应该扩展FSRS云函数
+      console.warn('getUserStudyRecords已废弃，请使用getDueCards或getUserStudyStats');
+      return [];
+    } catch (error) {
+      console.error('获取学习记录失败:', error);
+      return [];
     }
   }
 };

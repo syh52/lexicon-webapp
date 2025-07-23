@@ -13,6 +13,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    emptyOutDir: true, // 构建前自动清空输出目录
     assetsDir: 'assets',
     sourcemap: false,
     // 优化构建配置

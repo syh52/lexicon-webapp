@@ -4,8 +4,11 @@
   "description": "获取词书和单词数据",
   "main": "index.js",
   "dependencies": {
-    "@cloudbase/node-sdk": "^2.4.1"
+    "@cloudbase/node-sdk": "^2.0.0"
   },
-  "author": "",
-  "license": "ISC"
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Lexicon WebApp",
+  "license": "MIT"
 } 

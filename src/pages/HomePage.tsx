@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, MessageCircle, CheckCircle, User, Upload, Settings, Zap } from "lucide-react";
+import { BookOpen, MessageCircle, CheckCircle, User, Upload, Settings, Zap, Mic } from "lucide-react";
 import WelcomeHeroCard from '../components/WelcomeHeroCard';
 
 // 这是原项目中最满意的首页设计示例
@@ -43,6 +43,10 @@ export default function HomePage() {
 
   const navigateToManage = () => {
     navigate('/profile');
+  };
+
+  const navigateToVoiceAssistant = () => {
+    navigate('/voice-assistant');
   };
 
   if (isLoading) {
@@ -113,6 +117,18 @@ export default function HomePage() {
             </div>
             <h4 className="text-sm sm:text-base md:text-lg font-inter font-semibold text-white mb-2 sm:mb-3 tracking-tight">智能测验</h4>
             <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">Quizzes</p>
+          </div>
+
+          {/* Voice Assistant Module */}
+          <div 
+            onClick={navigateToVoiceAssistant}
+            className="glass-card rounded-2xl sm:rounded-3xl p-5 sm:p-6 md:p-8 perspective-element transform transition-all duration-200 ease-out hover:scale-105 cursor-pointer active:scale-95 btn-enhanced border-orange-500/30"
+          >
+            <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-orange-500/20 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
+              <Mic className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-orange-400" />
+            </div>
+            <h4 className="text-sm sm:text-base md:text-lg font-inter font-semibold text-white mb-2 sm:mb-3 tracking-tight">语音助手</h4>
+            <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">Voice AI</p>
           </div>
 
           {/* Upload Module - Available for all authenticated users */}

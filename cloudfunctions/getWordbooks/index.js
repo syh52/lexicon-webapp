@@ -1,10 +1,11 @@
-const tcb = require('@cloudbase/node-sdk');
+const cloudbase = require('@cloudbase/node-sdk');
+
+// 初始化CloudBase
+const app = cloudbase.init({
+  env: cloudbase.SYMBOL_CURRENT_ENV
+});
 
 exports.main = async (event, context) => {
-  // 初始化CloudBase
-  const app = tcb.init({
-    env: 'cloud1-7g7oatv381500c81'
-  });
   
   const db = app.database();
   

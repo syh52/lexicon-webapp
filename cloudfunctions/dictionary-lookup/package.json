@@ -1,0 +1,9 @@
+{
+  "name": "dictionary-lookup",
+  "version": "1.0.0",
+  "description": "Dictionary lookup function for learning agents",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.5.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "speech-recognition",
+  "version": "1.0.0",
+  "description": "CloudBase Speech Recognition Function",
+  "main": "index.js",
+  "dependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

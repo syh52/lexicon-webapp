@@ -14,19 +14,20 @@ export const ANIMATION_DELAYS: Record<AnimationDelay, string> = {
 export const STYLES = {
   container: `
     relative w-full max-w-2xl mx-auto
+    px-4 sm:px-6 md:px-8
     bg-gradient-to-br from-purple-500/20 to-blue-500/20
     backdrop-blur-xl rounded-3xl
-    shadow-lg border border-white/10
-    p-6 sm:p-8 md:p-10
+    shadow-2xl
+    p-8 sm:p-10 md:p-12
     transition-all duration-300
-    hover:shadow-xl hover:scale-105
-    active:scale-95
+    hover:shadow-2xl hover:scale-[1.02]
+    active:scale-[0.98]
   `,
   backgroundLayer: `
     absolute inset-0 bg-gradient-to-br from-purple-500/5 to-blue-500/5 rounded-3xl
   `,
   cardContainer: `
-    relative z-10 glass-card rounded-3xl p-6 sm:p-8 md:p-10
+    relative z-10
   `,
   contentCenter: `
     text-center
@@ -38,7 +39,7 @@ export const STYLES = {
   subtitle: `
     text-sm sm:text-base
     font-light tracking-wide
-    text-gray-300
+    text-purple-300/90
     uppercase
     mb-3 sm:mb-4
   `,
@@ -52,7 +53,7 @@ export const STYLES = {
   `,
   description: `
     text-base sm:text-lg
-    text-gray-300
+    text-gray-300/80
     font-light
     leading-relaxed
     max-w-xl mx-auto

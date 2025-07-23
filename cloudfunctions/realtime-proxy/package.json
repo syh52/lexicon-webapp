@@ -1,0 +1,22 @@
+{
+  "name": "realtime-proxy",
+  "version": "1.0.0",
+  "description": "OpenAI Realtime API代理云函数",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.10.0",
+    "node-fetch": "^2.6.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "cloudbase",
+    "openai",
+    "realtime",
+    "voice",
+    "assistant"
+  ],
+  "author": "Lexicon Team",
+  "license": "MIT"
+}

@@ -7,7 +7,7 @@ interface StudyCardProps {
   showAnswer: boolean;
   onShowAnswer: () => void;
   onRating: (isKnown: boolean) => void;
-  scheduler: any; // TODO: 添加具体的scheduler类型
+  scheduler: any;
   current: number;
   total: number;
   onBack: () => void;

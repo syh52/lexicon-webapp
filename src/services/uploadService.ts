@@ -1,5 +1,4 @@
-// @ts-ignore
-import { app } from '../utils/cloudbase.js';
+import { app } from '../utils/cloudbase';
 import { parseCSV, parseJSON, WordData, WordbookData } from '../utils/fileUtils';
 
 export interface UploadResult {

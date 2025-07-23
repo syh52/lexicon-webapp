@@ -1,10 +1,11 @@
-const cloud = require('wx-server-sdk');
+const cloudbase = require('@cloudbase/node-sdk');
 
-cloud.init({
-  env: cloud.DYNAMIC_CURRENT_ENV
+// 初始化CloudBase
+const app = cloudbase.init({
+  env: cloudbase.SYMBOL_CURRENT_ENV
 });
 
-const db = cloud.database();
+const db = app.database();
 
 // 默认用户设置
 const DEFAULT_USER_SETTINGS = {

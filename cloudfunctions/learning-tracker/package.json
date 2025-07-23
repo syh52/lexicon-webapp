@@ -1,0 +1,9 @@
+{
+  "name": "learning-tracker",
+  "version": "1.0.0",
+  "description": "Learning progress tracker with FSRS algorithm",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.5.0"
+  }
+}

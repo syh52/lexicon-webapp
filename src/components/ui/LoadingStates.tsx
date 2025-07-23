@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 /**
@@ -287,35 +287,80 @@ const PageLoader = ({
   text?: string;
   showProgress?: boolean;
   progress?: number;
-}) => (
-  <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-    <div className="text-center space-y-6">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="space-y-4"
-      >
-        <div className="flex justify-center">
-          <WaveLoader />
-        </div>
-        <div className="text-white">
-          <h2 className="text-2xl font-semibold mb-2">{text}</h2>
-          {showProgress && (
-            <div className="w-64 bg-gray-800 rounded-full h-2">
-              <motion.div
-                className="bg-purple-500 h-2 rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.5 }}
-              />
+}) => {
+  const [dots, setDots] = useState('');
+  
+  // 动态显示加载点
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots(prev => {
+        if (prev.length >= 3) return '';
+        return prev + '.';
+      });
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="text-center space-y-6 max-w-sm mx-auto px-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="space-y-6"
+        >
+          <div className="flex justify-center">
+            <div className="relative">
+              <WaveLoader />
+              {/* 添加脉冲效果 */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 bg-purple-500/20 rounded-full animate-ping"></div>
+              </div>
             </div>
-          )}
-        </div>
-      </motion.div>
+          </div>
+          
+          <div className="text-white">
+            <h2 className="text-xl font-semibold mb-2">
+              {text}
+              <span className="text-purple-400 inline-block w-8 text-left">{dots}</span>
+            </h2>
+            
+            {showProgress && (
+              <div className="w-64 bg-gray-800 rounded-full h-2 mx-auto">
+                <motion.div
+                  className="bg-purple-500 h-2 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+            )}
+            
+            {/* 添加提示信息 */}
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-gray-500">
+                首次加载可能需要几秒钟
+              </p>
+              
+              {/* 超过10秒显示额外提示 */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 10, duration: 0.3 }}
+                className="text-xs text-gray-600"
+              >
+                <p>加载时间较长？可能是网络较慢</p>
+                <p>您也可以尝试刷新页面</p>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // 内联加载组件
 const InlineLoader = ({ 
@@ -328,6 +373,48 @@ const InlineLoader = ({
   <div className="flex items-center justify-center space-x-3 p-4">
     <LoadingSpinner size={size} />
     <span className="text-gray-600">{text}</span>
+  </div>
+);
+
+// 按钮加载组件  
+const ButtonLoader = ({ 
+  size = 'md',
+  variant = 'primary' 
+}: {
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary';
+}) => {
+  const sizeClasses = {
+    sm: 'h-8 px-3',
+    md: 'h-10 px-4', 
+    lg: 'h-12 px-6'
+  };
+
+  const variantClasses = {
+    primary: 'bg-purple-600',
+    secondary: 'bg-gray-800'
+  };
+
+  return (
+    <div className={`inline-flex items-center justify-center rounded-lg animate-pulse ${sizeClasses[size]} ${variantClasses[variant]}`}>
+      <LoadingSpinner size="sm" color="gray" />
+    </div>
+  );
+};
+
+// 组件级加载器
+const ComponentLoader = ({ 
+  height = 'h-32',
+  text = '组件加载中...'
+}: {
+  height?: string;
+  text?: string;
+}) => (
+  <div className={`flex items-center justify-center ${height} bg-gray-800/50 rounded-lg`}>
+    <div className="text-center space-y-3">
+      <PulseLoader />
+      <p className="text-sm text-gray-400">{text}</p>
+    </div>
   </div>
 );
 
@@ -346,7 +433,9 @@ export {
   SkeletonStatsPage,
   FullScreenLoader,
   PageLoader,
-  InlineLoader
+  InlineLoader,
+  ButtonLoader,
+  ComponentLoader
 };
 
 // 默认导出
@@ -364,5 +453,7 @@ export default {
   SkeletonStatsPage,
   FullScreenLoader,
   PageLoader,
-  InlineLoader
+  InlineLoader,
+  ButtonLoader,
+  ComponentLoader
 };

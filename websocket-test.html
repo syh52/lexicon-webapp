@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Realtime API 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>🎤 WebSocket Realtime API 测试</h1>
+    
+    <div class="test-section">
+        <h3>测试配置</h3>
+        <p><strong>API Key:</strong> sk-MVwM0Y77CDZbTMT0cFoDe5WSZuYZk1G64dMWE6hpBitqgkgT</p>
+        <p><strong>Base URL:</strong> https://www.chataiapi.com/v1</p>
+        <p><strong>支持的模型:</strong></p>
+        <ul>
+            <li>gpt-4o-realtime-preview</li>
+            <li>gpt-4o-realtime-preview-2024-10-01</li>
+            <li>gpt-4o-realtime-preview-2025-06-03</li>
+            <li>gpt-4o-realtime-preview-2024-12-17</li>
+            <li>gpt-4o-mini-realtime-preview-2024-12-17</li>
+            <li>gpt-4o-mini-realtime-preview</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>WebSocket 连接测试</h3>
+        <select id="modelSelect">
+            <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
+            <option value="gpt-4o-realtime-preview-2024-10-01">gpt-4o-realtime-preview-2024-10-01</option>
+            <option value="gpt-4o-realtime-preview-2025-06-03">gpt-4o-realtime-preview-2025-06-03</option>
+            <option value="gpt-4o-realtime-preview-2024-12-17">gpt-4o-realtime-preview-2024-12-17</option>
+            <option value="gpt-4o-mini-realtime-preview-2024-12-17">gpt-4o-mini-realtime-preview-2024-12-17</option>
+            <option value="gpt-4o-mini-realtime-preview">gpt-4o-mini-realtime-preview</option>
+        </select>
+        <button id="connectBtn" onclick="testWebSocketConnection()">连接 WebSocket</button>
+        <button id="disconnectBtn" onclick="disconnectWebSocket()" disabled>断开连接</button>
+        <button id="sendTestBtn" onclick="sendTestMessage()" disabled>发送测试消息</button>
+        <button id="clearLogBtn" onclick="clearLog()">清除日志</button>
+    </div>
+
+    <div class="test-section">
+        <h3>连接日志</h3>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        const API_KEY = 'sk-MVwM0Y77CDZbTMT0cFoDe5WSZuYZk1G64dMWE6hpBitqgkgT';
+
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${timestamp}] ${message}`;
+            logElement.appendChild(div);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function updateButtons(connected) {
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('sendTestBtn').disabled = !connected;
+        }
+
+        function testWebSocketConnection() {
+            const model = document.getElementById('modelSelect').value;
+            
+            // 尝试多种可能的 WebSocket URL 格式
+            const possibleUrls = [
+                `wss://www.chataiapi.com/v1/realtime?model=${model}`,
+                `wss://www.chataiapi.com/v1/realtime`,
+                `wss://api.chataiapi.com/v1/realtime?model=${model}`,
+                `wss://api.chataiapi.com/v1/realtime`
+            ];
+
+            log(`🔍 准备测试 WebSocket 连接，模型: ${model}`, 'info');
+            
+            // 测试第一个URL
+            const wsUrl = possibleUrls[0];
+            log(`🔗 尝试连接: ${wsUrl}`, 'info');
+
+            try {
+                // 根据文档使用正确的协议格式
+                ws = new WebSocket(wsUrl, [
+                    "realtime",
+                    "openai-insecure-api-key." + API_KEY,
+                    "openai-beta.realtime-v1"
+                ]);
+
+                log(`✅ WebSocket 创建成功，协议: ["realtime", "openai-insecure-api-key.${API_KEY.substring(0, 7)}...", "openai-beta.realtime-v1"]`, 'success');
+
+                ws.onopen = function(event) {
+                    log('🎉 WebSocket 连接成功!', 'success');
+                    updateButtons(true);
+                    
+                    // 发送会话配置
+                    const sessionConfig = {
+                        type: 'session.update',
+                        session: {
+                            modalities: ['text', 'audio'],
+                            instructions: '你是一个有帮助的AI助手。请用中文回复。',
+                            voice: 'nova',
+                            input_audio_format: 'pcm16',
+                            output_audio_format: 'pcm16',
+                            temperature: 0.7
+                        }
+                    };
+                    
+                    ws.send(JSON.stringify(sessionConfig));
+                    log('📤 发送会话配置', 'info');
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const message = JSON.parse(event.data);
+                        log(`📥 收到消息: ${message.type}`, 'success');
+                        log(`📋 消息内容: ${JSON.stringify(message, null, 2)}`, 'info');
+                    } catch (error) {
+                        log(`❌ 解析消息失败: ${error.message}`, 'error');
+                        log(`📄 原始消息: ${event.data}`, 'info');
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    log(`❌ WebSocket 错误: ${error}`, 'error');
+                    log(`🔗 错误URL: ${wsUrl}`, 'error');
+                    updateButtons(false);
+                };
+
+                ws.onclose = function(event) {
+                    const closeReasons = {
+                        1000: 'Normal closure',
+                        1001: 'Going away',
+                        1002: 'Protocol error',
+                        1003: 'Unsupported data',
+                        1006: 'No status code',
+                        1007: 'Invalid data',
+                        1008: 'Policy violation',
+                        1009: 'Message too large',
+                        1010: 'Extension expected',
+                        1011: 'Server error',
+                        1015: 'TLS failure'
+                    };
+                    
+                    const reason = closeReasons[event.code] || `Unknown (${event.code})`;
+                    log(`🔌 WebSocket 连接关闭: ${reason} - ${event.reason}`, event.code === 1000 ? 'info' : 'error');
+                    updateButtons(false);
+                    ws = null;
+                };
+
+            } catch (error) {
+                log(`❌ 创建 WebSocket 失败: ${error.message}`, 'error');
+                updateButtons(false);
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                log('🔌 主动断开 WebSocket 连接', 'info');
+                ws.close();
+                ws = null;
+            }
+            updateButtons(false);
+        }
+
+        function sendTestMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket 未连接', 'error');
+                return;
+            }
+
+            const testMessage = {
+                type: 'conversation.item.create',
+                item: {
+                    type: 'message',
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'input_text',
+                            text: '你好！请用中文回复我。'
+                        }
+                    ]
+                }
+            };
+
+            try {
+                ws.send(JSON.stringify(testMessage));
+                log('📤 发送测试消息: 你好！请用中文回复我。', 'info');
+                
+                // 触发响应生成
+                const responseCreate = {
+                    type: 'response.create'
+                };
+                ws.send(JSON.stringify(responseCreate));
+                log('📤 触发响应生成', 'info');
+                
+            } catch (error) {
+                log(`❌ 发送消息失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载完成后的初始化
+        window.onload = function() {
+            log('🚀 WebSocket Realtime API 测试页面已加载', 'success');
+            log('📋 根据用户提供信息，chataiapi.com 支持 realtime WebSocket 端点', 'info');
+            updateButtons(false);
+        };
+
+        // 注册测试账户信息记录
+        const TEST_ACCOUNT = {
+            email: 'lexicon.test.user@example.com',
+            password: 'LexiconTest2025!',
+            username: 'lexicon_test_user',
+            note: '这是为WebSocket测试创建的专用测试账户'
+        };
+        
+        log(`🔐 测试账户信息已记录: ${TEST_ACCOUNT.email}`, 'info');
+    </script>
+</body>
+</html>

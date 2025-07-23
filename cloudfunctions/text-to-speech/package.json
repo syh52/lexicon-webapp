@@ -1,0 +1,21 @@
+{
+  "name": "text-to-speech",
+  "version": "1.0.0",
+  "description": "Text to speech synthesis using OpenAI TTS API compatible service",
+  "main": "index.js",
+  "dependencies": {
+    "openai": "^4.63.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "cloudbase",
+    "text-to-speech",
+    "tts",
+    "openai",
+    "speech-synthesis"
+  ],
+  "author": "Lexicon WebApp",
+  "license": "MIT"
+}

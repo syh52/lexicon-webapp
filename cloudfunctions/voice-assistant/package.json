@@ -1,0 +1,26 @@
+{
+  "name": "voice-assistant",
+  "version": "1.0.0",
+  "description": "English learning voice assistant with real-time WebSocket communication",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.0.0",
+    "ws": "^8.14.2",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "cloudbase",
+    "voice-assistant",
+    "websocket",
+    "english-learning",
+    "ai"
+  ],
+  "author": "Lexicon WebApp",
+  "license": "MIT"
+}

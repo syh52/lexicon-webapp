@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen, Play, BarChart3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-// @ts-ignore
-import { app } from '../utils/cloudbase.js';
+import { app } from '../utils/cloudbase';
 
 interface Wordbook {
   _id: string;
@@ -27,37 +26,27 @@ export default function WordbooksPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // RequireAuth已确保用户已登录，直接加载词书
     loadWordbooks();
   }, []);
-
-  // 监听用户状态变化，确保登录状态变化时重新加载数据
-  useEffect(() => {
-    if (user) {
-      loadWordbooks();
-    }
-  }, [user]);
 
   // 监听页面可见性变化，当页面重新获得焦点时刷新数据
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && user) {
+      if (!document.hidden) {
         loadWordbooks();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user]);
+  }, []);
 
   const loadWordbooks = async () => {
     try {
       setLoading(true);
       setError(null);
-      // 如果用户未登录，直接返回空数组
-      if (!user) {
-        setWordbooks([]);
-        return;
-      }
+      // RequireAuth已确保用户已登录，无需再次检查
       
       // 调用云函数获取真实数据
       const result = await app.callFunction({

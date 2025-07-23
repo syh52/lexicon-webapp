@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语音AI助手 - 快速测试页面</title>
+    <script src="https://static.cloudbase.net/cloudbase-js-sdk/2.17.5/cloudbase.full.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1f2937;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+        }
+        .test-section h2 {
+            color: #374151;
+            margin-top: 0;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        pre {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        .progress {
+            width: 100%;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 语音AI助手快速测试</h1>
+        
+        <!-- CloudBase 连接测试 -->
+        <div class="test-section">
+            <h2>1. CloudBase 连接测试</h2>
+            <div id="cloudbase-status" class="status info">准备测试CloudBase连接...</div>
+            <button onclick="testCloudBase()">测试CloudBase连接</button>
+            <div class="progress">
+                <div id="cloudbase-progress" class="progress-bar"></div>
+            </div>
+            <pre id="cloudbase-result"></pre>
+        </div>
+
+        <!-- 云函数测试 -->
+        <div class="test-section">
+            <h2>2. 云函数调用测试</h2>
+            <div id="functions-status" class="status info">准备测试云函数调用...</div>
+            <button onclick="testAIChat()">测试AI对话函数</button>
+            <button onclick="testASR()">测试语音识别函数</button>
+            <button onclick="testTTS()">测试语音合成函数</button>
+            <div class="progress">
+                <div id="functions-progress" class="progress-bar"></div>
+            </div>
+            <pre id="functions-result"></pre>
+        </div>
+
+        <!-- 音频权限测试 -->
+        <div class="test-section">
+            <h2>3. 音频权限测试</h2>
+            <div id="audio-status" class="status info">准备测试音频权限...</div>
+            <button onclick="testAudioPermission()">测试麦克风权限</button>
+            <button onclick="startRecording()" id="record-btn">开始录音</button>
+            <button onclick="stopRecording()" id="stop-btn" disabled>停止录音</button>
+            <div class="progress">
+                <div id="audio-progress" class="progress-bar"></div>
+            </div>
+            <canvas id="audio-canvas" width="400" height="100" style="border: 1px solid #e5e7eb; border-radius: 4px; margin: 10px 0;"></canvas>
+            <pre id="audio-result"></pre>
+        </div>
+
+        <!-- 系统信息 -->
+        <div class="test-section">
+            <h2>4. 系统信息</h2>
+            <div id="system-info">
+                <p><strong>浏览器:</strong> <span id="browser-info"></span></p>
+                <p><strong>用户代理:</strong> <span id="user-agent"></span></p>
+                <p><strong>支持的功能:</strong></p>
+                <ul id="features-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let app = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let audioContext = null;
+        let analyser = null;
+
+        // 页面加载时初始化
+        window.onload = function() {
+            updateSystemInfo();
+            checkCloudBaseSDK();
+        };
+        
+        // 检查CloudBase SDK状态
+        function checkCloudBaseSDK() {
+            const statusEl = document.getElementById('cloudbase-status');
+            if (typeof cloudbase !== 'undefined') {
+                statusEl.innerHTML = '✅ CloudBase SDK已加载，可以开始测试';
+                statusEl.className = 'status success';
+            } else {
+                statusEl.innerHTML = '❌ CloudBase SDK加载失败，请刷新页面';
+                statusEl.className = 'status error';
+            }
+        }
+
+        // 更新系统信息
+        function updateSystemInfo() {
+            document.getElementById('browser-info').textContent = navigator.userAgent.split(' ').pop();
+            document.getElementById('user-agent').textContent = navigator.userAgent;
+            
+            const features = [
+                { name: 'MediaRecorder API', supported: 'MediaRecorder' in window },
+                { name: 'Web Audio API', supported: 'AudioContext' in window || 'webkitAudioContext' in window },
+                { name: 'WebSocket', supported: 'WebSocket' in window },
+                { name: 'Fetch API', supported: 'fetch' in window },
+                { name: 'Promise', supported: 'Promise' in window }
+            ];
+            
+            const featuresList = document.getElementById('features-list');
+            features.forEach(feature => {
+                const li = document.createElement('li');
+                li.innerHTML = `${feature.name}: <span style="color: ${feature.supported ? '#059669' : '#dc2626'}">${feature.supported ? '✅ 支持' : '❌ 不支持'}</span>`;
+                featuresList.appendChild(li);
+            });
+        }
+
+        // 测试CloudBase连接
+        async function testCloudBase() {
+            const statusEl = document.getElementById('cloudbase-status');
+            const progressEl = document.getElementById('cloudbase-progress');
+            const resultEl = document.getElementById('cloudbase-result');
+            
+            try {
+                // 检查SDK是否可用
+                if (typeof cloudbase === 'undefined') {
+                    throw new Error('CloudBase SDK未正确加载，请刷新页面重试或检查网络连接');
+                }
+                
+                statusEl.textContent = '正在初始化CloudBase...';
+                statusEl.className = 'status info';
+                progressEl.style.width = '20%';
+                
+                // 初始化CloudBase
+                app = cloudbase.init({
+                    env: 'cloud1-7g7oatv381500c81'
+                });
+                
+                progressEl.style.width = '50%';
+                
+                // 匿名登录
+                statusEl.textContent = '正在进行匿名登录...';
+                await app.auth().signInAnonymously();
+                
+                progressEl.style.width = '80%';
+                
+                // 获取登录状态
+                const loginState = await app.auth().getLoginState();
+                
+                progressEl.style.width = '100%';
+                statusEl.textContent = 'CloudBase连接成功！';
+                statusEl.className = 'status success';
+                
+                resultEl.textContent = JSON.stringify({
+                    success: true,
+                    env: 'cloud1-7g7oatv381500c81',
+                    loginState: {
+                        isLoggedIn: loginState.isLoggedIn,
+                        loginType: loginState.loginType,
+                        uid: loginState.user?.uid
+                    }
+                }, null, 2);
+                
+            } catch (error) {
+                progressEl.style.width = '100%';
+                statusEl.textContent = 'CloudBase连接失败: ' + error.message;
+                statusEl.className = 'status error';
+                resultEl.textContent = JSON.stringify({ error: error.message }, null, 2);
+            }
+        }
+
+        // 测试AI对话函数
+        async function testAIChat() {
+            if (!app) {
+                alert('请先测试CloudBase连接');
+                return;
+            }
+            
+            const statusEl = document.getElementById('functions-status');
+            const progressEl = document.getElementById('functions-progress');
+            const resultEl = document.getElementById('functions-result');
+            
+            try {
+                statusEl.textContent = '正在调用AI对话函数...';
+                statusEl.className = 'status info';
+                progressEl.style.width = '30%';
+                
+                progressEl.style.width = '60%';
+                
+                // 直接调用AI函数
+                const result = await app.callFunction({
+                    name: 'ai-chat',
+                    data: {
+                        messages: [
+                            { role: 'user', content: 'Hello, this is a test message. How are you?' }
+                        ],
+                        userLevel: 'intermediate',
+                        scenario: 'general'
+                    }
+                });
+                
+                progressEl.style.width = '100%';
+                statusEl.textContent = 'AI对话函数测试成功！';
+                statusEl.className = 'status success';
+                resultEl.textContent = JSON.stringify(result, null, 2);
+                
+            } catch (error) {
+                progressEl.style.width = '100%';
+                statusEl.textContent = 'AI对话函数测试失败: ' + error.message;
+                statusEl.className = 'status error';
+                resultEl.textContent = JSON.stringify({ 
+                    error: error.message,
+                    suggestion: '请在CloudBase控制台为ai-chat函数点击"云端安装依赖"'
+                }, null, 2);
+            }
+        }
+
+        // 测试语音识别函数
+        async function testASR() {
+            if (!app) {
+                alert('请先测试CloudBase连接');
+                return;
+            }
+            
+            const statusEl = document.getElementById('functions-status');
+            const progressEl = document.getElementById('functions-progress');
+            const resultEl = document.getElementById('functions-result');
+            
+            try {
+                statusEl.textContent = '正在调用语音识别函数...';
+                statusEl.className = 'status info';
+                progressEl.style.width = '30%';
+                
+                // 使用测试音频数据
+                const testAudio = btoa('test audio data');
+                
+                const result = await app.callFunction({
+                    name: 'speech-recognition',
+                    data: {
+                        audio: testAudio,
+                        language: 'en-US',
+                        format: 'pcm',
+                        sampleRate: 24000
+                    }
+                });
+                
+                progressEl.style.width = '100%';
+                statusEl.textContent = '语音识别函数测试成功！';
+                statusEl.className = 'status success';
+                resultEl.textContent = JSON.stringify(result, null, 2);
+                
+            } catch (error) {
+                progressEl.style.width = '100%';
+                statusEl.textContent = '语音识别函数测试失败: ' + error.message;
+                statusEl.className = 'status error';
+                resultEl.textContent = JSON.stringify({ error: error.message }, null, 2);
+            }
+        }
+
+        // 测试语音合成函数
+        async function testTTS() {
+            if (!app) {
+                alert('请先测试CloudBase连接');
+                return;
+            }
+            
+            const statusEl = document.getElementById('functions-status');
+            const progressEl = document.getElementById('functions-progress');
+            const resultEl = document.getElementById('functions-result');
+            
+            try {
+                statusEl.textContent = '正在调用语音合成函数...';
+                statusEl.className = 'status info';
+                progressEl.style.width = '30%';
+                
+                const result = await app.callFunction({
+                    name: 'text-to-speech',
+                    data: {
+                        text: 'Hello, this is a test message for text to speech synthesis.',
+                        voice: 'female'
+                    }
+                });
+                
+                progressEl.style.width = '100%';
+                statusEl.textContent = '语音合成函数测试成功！';
+                statusEl.className = 'status success';
+                resultEl.textContent = JSON.stringify({
+                    success: result.success,
+                    method: result.method,
+                    audioLength: result.audio ? result.audio.length : 0
+                }, null, 2);
+                
+            } catch (error) {
+                progressEl.style.width = '100%';
+                statusEl.textContent = '语音合成函数测试失败: ' + error.message;
+                statusEl.className = 'status error';
+                resultEl.textContent = JSON.stringify({ error: error.message }, null, 2);
+            }
+        }
+
+        // 测试音频权限
+        async function testAudioPermission() {
+            const statusEl = document.getElementById('audio-status');
+            const progressEl = document.getElementById('audio-progress');
+            const resultEl = document.getElementById('audio-result');
+            
+            try {
+                statusEl.textContent = '正在请求麦克风权限...';
+                statusEl.className = 'status info';
+                progressEl.style.width = '30%';
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 24000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } 
+                });
+                
+                progressEl.style.width = '70%';
+                
+                // 创建音频上下文
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                source.connect(analyser);
+                
+                progressEl.style.width = '100%';
+                statusEl.textContent = '音频权限获取成功！可以开始录音测试';
+                statusEl.className = 'status success';
+                
+                document.getElementById('record-btn').disabled = false;
+                
+                // 开始音频可视化
+                drawAudioVisualization();
+                
+                resultEl.textContent = JSON.stringify({
+                    success: true,
+                    audioContext: {
+                        sampleRate: audioContext.sampleRate,
+                        state: audioContext.state
+                    },
+                    mediaStream: {
+                        active: stream.active,
+                        audioTracks: stream.getAudioTracks().length
+                    }
+                }, null, 2);
+                
+            } catch (error) {
+                progressEl.style.width = '100%';
+                statusEl.textContent = '音频权限获取失败: ' + error.message;
+                statusEl.className = 'status error';
+                resultEl.textContent = JSON.stringify({ error: error.message }, null, 2);
+            }
+        }
+
+        // 开始录音
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    document.getElementById('audio-result').textContent = 
+                        `录音完成！音频大小: ${audioBlob.size} 字节`;
+                    audioChunks = [];
+                };
+                
+                mediaRecorder.start();
+                document.getElementById('record-btn').disabled = true;
+                document.getElementById('stop-btn').disabled = false;
+                document.getElementById('audio-status').textContent = '正在录音...';
+                document.getElementById('audio-status').className = 'status info';
+                
+            } catch (error) {
+                alert('录音启动失败: ' + error.message);
+            }
+        }
+
+        // 停止录音
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                document.getElementById('record-btn').disabled = false;
+                document.getElementById('stop-btn').disabled = true;
+                document.getElementById('audio-status').textContent = '录音已停止';
+                document.getElementById('audio-status').className = 'status success';
+            }
+        }
+
+        // 音频可视化
+        function drawAudioVisualization() {
+            if (!analyser) return;
+            
+            const canvas = document.getElementById('audio-canvas');
+            const ctx = canvas.getContext('2d');
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            function draw() {
+                requestAnimationFrame(draw);
+                
+                analyser.getByteFrequencyData(dataArray);
+                
+                ctx.fillStyle = '#f3f4f6';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const barWidth = (canvas.width / bufferLength) * 2.5;
+                let barHeight;
+                let x = 0;
+                
+                for (let i = 0; i < bufferLength; i++) {
+                    barHeight = (dataArray[i] / 255) * canvas.height;
+                    
+                    const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
+                    gradient.addColorStop(0, '#667eea');
+                    gradient.addColorStop(1, '#764ba2');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    
+                    x += barWidth + 1;
+                }
+            }
+            
+            draw();
+        }
+    </script>
+</body>
+</html>

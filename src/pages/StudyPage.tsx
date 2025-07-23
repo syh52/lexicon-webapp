@@ -5,9 +5,8 @@ import { StudyCard } from '../components/study/StudyCard';
 import { DailyStudyPlan } from '../services/DailyPlanGenerator';
 import dailyPlanService from '../services/dailyPlanService';
 import wordbookService, { Word, StudyRecord } from '../services/wordbookService';
-import { processUserChoice, SimpleWordRecord } from '../utils/simpleReviewAlgorithm.js';
-// @ts-ignore
-import { app, ensureLogin } from '../utils/cloudbase.js';
+import { processUserChoice, SimpleWordRecord } from '../utils/simpleReviewAlgorithm';
+import { app, ensureLogin } from '../utils/cloudbase';
 
 interface StudySession {
   plan: DailyStudyPlan;
@@ -28,6 +27,7 @@ export default function StudyPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
+    // 由于已经被RequireAuth保护，user和wordbookId在这里一定存在
     if (wordbookId && user) {
       initializeStudySession();
     }
@@ -37,8 +37,10 @@ export default function StudyPage() {
     try {
       setIsLoading(true);
       
-      if (!user || !wordbookId) {
-        console.error('缺少用户或词书ID');
+      // RequireAuth已确保用户已登录，这里只需检查wordbookId
+      if (!wordbookId) {
+        console.error('缺少词书ID');
+        navigate('/wordbooks');
         return;
       }
       

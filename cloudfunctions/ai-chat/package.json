@@ -1,0 +1,12 @@
+{
+  "name": "ai-chat",
+  "version": "1.0.0",
+  "description": "AI对话云函数 - 使用OpenAI SDK",
+  "main": "index.js",
+  "dependencies": {
+    "openai": "^4.63.0"
+  },
+  "engines": {
+    "node": ">=18.15.0"
+  }
+}

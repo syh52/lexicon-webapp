@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { app, ensureLogin, getLoginState } from '../utils/cloudbase';
+import { getApp, ensureLogin, getLoginState, getCachedLoginState } from '../utils/cloudbase';
 import { User as UserType, ApiResponse } from '../types';
 
 interface User extends UserType {
@@ -81,13 +81,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // 先确保匿名登录以获取云函数调用权限
-      const auth = app.auth();
-      const loginState = await auth.getLoginState();
-      if (!loginState || !loginState.isLoggedIn) {
-        await auth.signInAnonymously();
-      }
+      console.log('🔄 AuthContext: 开始登录流程...');
       
+      // 确保CloudBase实例已初始化并登录
+      await ensureLogin();
+      const app = getApp();
+      
+      console.log('🔄 AuthContext: 调用登录云函数...');
       // 使用云函数验证用户凭据
       const loginResult = await app.callFunction({
         name: 'userInfo',
@@ -135,13 +135,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (email: string, password: string, displayName?: string) => {
     setIsLoading(true);
     try {
-      // 确保已登录（匿名登录）以便调用云函数
-      const auth = app.auth();
-      const loginState = await auth.getLoginState();
-      if (!loginState || !loginState.isLoggedIn) {
-        await auth.signInAnonymously();
-      }
+      console.log('🔄 AuthContext: 开始注册流程...');
       
+      // 确保CloudBase实例已初始化并登录
+      await ensureLogin();
+      const app = getApp();
+      
+      console.log('🔄 AuthContext: 调用注册云函数...');
       // 使用云函数注册
       const registerResult = await app.callFunction({
         name: 'userInfo',
@@ -210,13 +210,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const anonymousLogin = async () => {
     setIsLoading(true);
     try {
-      const auth = app.auth();
-      const loginState = await auth.signInAnonymously();
+      console.log('🔄 AuthContext: 执行匿名登录...');
       
-      if (loginState && loginState.user) {
+      // 使用统一的ensureLogin来处理匿名登录
+      const loginState = await ensureLogin();
+      
+      console.log('🔍 AuthContext: 检查匿名登录状态:', { 
+        hasLoginState: !!loginState, 
+        isLoggedIn: loginState?.isLoggedIn,
+        loginStateKeys: loginState ? Object.keys(loginState) : null 
+      });
+      
+      if (loginState && loginState.isLoggedIn) {
         // 创建匿名用户状态
         const userData: User = {
-          uid: loginState.user.uid,
+          uid: loginState.user?.uid || 'anonymous_' + Date.now(),
           displayName: '游客用户',
           username: 'anonymous',
           email: '',
@@ -236,9 +244,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // 将用户信息保存到本地存储
         localStorage.setItem('lexicon_user', JSON.stringify(userData));
         
-        }
+        console.log('✅ AuthContext: 匿名登录成功');
+      } else {
+        throw new Error('匿名登录失败');
+      }
     } catch (error) {
-      console.error('匿名登录失败:', error);
+      console.error('❌ AuthContext: 匿名登录失败:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -250,6 +261,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!user) {
         throw new Error('用户未登录');
       }
+
+      console.log('🔄 AuthContext: 更新用户信息...');
+      
+      // 确保CloudBase实例可用
+      await ensureLogin();
+      const app = getApp();
 
       // 通过云函数更新学习相关数据
       const result = await app.callFunction({

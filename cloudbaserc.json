@@ -1,0 +1,82 @@
+{
+  "$schema": "https://framework-1258016615.tcloudbaseapp.com/schema/latest.json",
+  "version": "2.0",
+  "envId": "cloud1-7g7oatv381500c81",
+  "framework": {
+    "name": "lexicon-webapp",
+    "plugins": {
+      "client": {
+        "use": "@cloudbase/framework-plugin-website",
+        "inputs": {
+          "buildCommand": "npm run build",
+          "outputPath": "dist",
+          "cloudPath": "/lexicon-webapp"
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "name": "ai-chat",
+      "source": "cloudfunctions/ai-chat",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true,
+      "envVariables": {
+        "API_KEY": "sk-MVwM0Y77CDZbTMT0cFoDe5WSZuYZk1G64dMWE6hpBitqgkgT",
+        "API_BASE": "https://www.chataiapi.com/v1",
+        "DEFAULT_MODEL": "gpt-4o-mini",
+        "TEMPERATURE": "0.7",
+        "MAX_TOKENS": "200"
+      }
+    },
+    {
+      "name": "speech-recognition", 
+      "source": "cloudfunctions/speech-recognition",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15"
+    },
+    {
+      "name": "text-to-speech",
+      "source": "cloudfunctions/text-to-speech", 
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true,
+      "envVariables": {
+        "API_KEY": "sk-MVwM0Y77CDZbTMT0cFoDe5WSZuYZk1G64dMWE6hpBitqgkgT",
+        "API_BASE": "https://www.chataiapi.com/v1"
+      }
+    },
+    {
+      "name": "realtime-proxy",
+      "source": "cloudfunctions/realtime-proxy",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true,
+      "envVariables": {
+        "OPENAI_API_KEY": "sk-MVwM0Y77CDZbTMT0cFoDe5WSZuYZk1G64dMWE6hpBitqgkgT"
+      }
+    },
+    {
+      "name": "dictionary-lookup",
+      "source": "cloudfunctions/dictionary-lookup",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true
+    },
+    {
+      "name": "learning-tracker",
+      "source": "cloudfunctions/learning-tracker",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true
+    }
+  ],
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "node_modules/**/*",
+      ".git/**/*"
+    ]
+  }
+}

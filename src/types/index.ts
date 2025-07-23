@@ -7,6 +7,8 @@ export interface User {
   avatar?: string;
   phone?: string;
   bio?: string;
+  isAdmin?: boolean;
+  isAnonymous?: boolean;
   createdAt: Date;
   lastLoginAt?: Date;
   preferences?: UserPreferences;

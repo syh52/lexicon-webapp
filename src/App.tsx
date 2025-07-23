@@ -1,28 +1,10 @@
 import React from 'react'
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
-import HomePage from './pages/HomePage'
-import AuthPage from './pages/AuthPage'
-import WordbooksPage from './pages/WordbooksPage'
-import StudyPage from './pages/StudyPage'
-import StatsPage from './pages/StatsPage'
-import ProfilePage from './pages/ProfilePage'
-import UploadPage from './pages/UploadPage'
-import SettingsPage from './pages/SettingsPage'
+import RequireAuth from './components/auth/RequireAuth'
+import { lazyRoutes } from './utils/lazyLoader'
 import AppLayout from './components/layout/AppLayout'
-// import { StagewiseToolbar } from '@stagewise/toolbar-react'
-// import ReactPlugin from '@stagewise-plugins/react'
 import './App.css'
-
-// 在开发环境引入配置验证
-// if (process.env.NODE_ENV === 'development') {
-//   import('./utils/debug').then(({ validateConfiguration }) => {
-//     // 延迟执行配置验证
-//     setTimeout(() => {
-//       validateConfiguration().catch(console.error);
-//     }, 3000);
-//   }).catch(console.error);
-// }
 
 // 简单的错误边界组件
 class ErrorBoundary extends React.Component {
@@ -68,20 +50,48 @@ function App() {
         <Router>
           <AppLayout>
             <Routes>
-              <Route path="/login" element={<AuthPage />} />
-              <Route path="/register" element={<AuthPage />} />
-              <Route path="/" element={<HomePage />} />
-              <Route path="/wordbooks" element={<WordbooksPage />} />
-              <Route path="/study/:wordbookId" element={<StudyPage />} />
-              <Route path="/stats" element={<StatsPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/upload" element={<UploadPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/chat" element={<div className="p-8 text-white text-center">智能对话功能开发中...</div>} />
-              <Route path="*" element={<HomePage />} />
+              <Route path="/login" element={<lazyRoutes.AuthPage />} />
+              <Route path="/register" element={<lazyRoutes.AuthPage />} />
+              <Route path="/" element={<lazyRoutes.HomePage />} />
+              <Route path="/wordbooks" element={
+                <RequireAuth>
+                  <lazyRoutes.WordbooksPage />
+                </RequireAuth>
+              } />
+              <Route path="/study/:wordbookId" element={
+                <RequireAuth>
+                  <lazyRoutes.StudyPage />
+                </RequireAuth>
+              } />
+              <Route path="/stats" element={
+                <RequireAuth>
+                  <lazyRoutes.StatsPage />
+                </RequireAuth>
+              } />
+              <Route path="/profile" element={
+                <RequireAuth>
+                  <lazyRoutes.ProfilePage />
+                </RequireAuth>
+              } />
+              <Route path="/upload" element={
+                <RequireAuth requireAdmin={true}>
+                  <lazyRoutes.UploadPage />
+                </RequireAuth>
+              } />
+              <Route path="/settings" element={
+                <RequireAuth>
+                  <lazyRoutes.SettingsPage />
+                </RequireAuth>
+              } />
+              <Route path="/voice-assistant" element={
+                <RequireAuth>
+                  <lazyRoutes.VoiceAssistantPage />
+                </RequireAuth>
+              } />
+              <Route path="/test" element={<lazyRoutes.TestPage />} />
+              <Route path="*" element={<lazyRoutes.NotFoundPage />} />
             </Routes>
           </AppLayout>
-          {/* <StagewiseToolbar config={{ plugins: [ReactPlugin] }} /> */}
         </Router>
       </AuthProvider>
     </ErrorBoundary>

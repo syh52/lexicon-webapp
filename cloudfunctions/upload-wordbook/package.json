@@ -4,8 +4,11 @@
   "description": "批量上传词书云函数",
   "main": "index.js",
   "dependencies": {
-    "@cloudbase/node-sdk": "^2.4.1"
+    "@cloudbase/node-sdk": "^2.0.0"
   },
-  "author": "",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Lexicon WebApp",
   "license": "MIT"
 }

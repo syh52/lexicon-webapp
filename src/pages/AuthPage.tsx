@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '../components/ui';
 import { Eye, EyeOff, ArrowLeft, User, Mail, Lock } from 'lucide-react';
 
 type AuthMode = 'login' | 'register';
