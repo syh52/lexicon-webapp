@@ -2,23 +2,15 @@
  * Agent配置统一入口
  * 管理所有学习场景的Agent配置
  */
-import vocabularyLearningScenario, { 
-  vocabularyLearningAgent,
-  pronunciationAgent,
-  conversationAgent
-} from './vocabularyLearning/index.js';
+import englishLearningAssistant from './vocabularyLearning/index.js';
 
 /**
  * 所有可用的Agent场景配置
  */
 export const allAgentSets = {
-  // 词汇学习场景（默认）
-  vocabularyLearning: vocabularyLearningScenario,
-  
-  // 单独的Agent访问
-  vocabulary: [vocabularyLearningAgent],
-  pronunciation: [pronunciationAgent], 
-  conversation: [conversationAgent],
+  // 综合英语学习助手（默认）
+  default: [englishLearningAssistant],
+  englishLearning: [englishLearningAssistant],
   
   // 可以添加更多学习场景
   // grammarFocus: grammarFocusScenario,
@@ -29,22 +21,14 @@ export const allAgentSets = {
 /**
  * 默认Agent场景
  */
-export const defaultAgentSet = 'vocabularyLearning';
+export const defaultAgentSet = 'default';
 
 /**
  * 根据学习目标获取推荐的Agent配置
  */
 export function getRecommendedAgentSet(learningGoal, userLevel = 'intermediate') {
-  const recommendations = {
-    'vocabulary': 'vocabulary',
-    'pronunciation': 'pronunciation', 
-    'conversation': 'conversation',
-    'general': 'vocabularyLearning',
-    'speaking': 'conversation',
-    'words': 'vocabulary'
-  };
-
-  return recommendations[learningGoal?.toLowerCase()] || defaultAgentSet;
+  // 现在只有一个综合性助手，适用于所有学习目标
+  return defaultAgentSet;
 }
 
 /**
