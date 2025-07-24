@@ -6,7 +6,11 @@
 
 ## 🚀 在线体验
 
-**[https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com/](https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com/)**
+**[https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com](https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com)**
+
+> 📅 最后部署: 2025-07-24  
+> ✅ 状态: 正常运行  
+> 🔧 版本: v1.0.0
 
 ## ✨ 项目特色
 
@@ -115,7 +119,9 @@ tcb fn deploy fsrs-service
 npm run start
 ```
 
-## 部署指南
+## 📚 部署指南
+
+> 💡 **重要**: 部署前请先阅读 [部署最佳实践指南](./部署最佳实践指南.md) 和 [部署检查清单](./部署检查清单.md)
 
 ### 快速部署到静态网站托管
 

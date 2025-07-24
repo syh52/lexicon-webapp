@@ -10,7 +10,7 @@
         "inputs": {
           "buildCommand": "npm run build",
           "outputPath": "dist",
-          "cloudPath": "/lexicon-webapp"
+          "cloudPath": "/"
         }
       }
     }
@@ -34,7 +34,12 @@
       "name": "speech-recognition", 
       "source": "cloudfunctions/speech-recognition",
       "entry": "index.js",
-      "runtime": "Nodejs18.15"
+      "runtime": "Nodejs18.15",
+      "installDependency": true,
+      "envVariables": {
+        "OPENAI_API_KEY": "sk-MVwM0Y77CDZbTMT0cFoDe5WSZuYZk1G64dMWE6hpBitqgkgT",
+        "OPENAI_API_BASE": "https://www.chataiapi.com/v1"
+      }
     },
     {
       "name": "text-to-speech",

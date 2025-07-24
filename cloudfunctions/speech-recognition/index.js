@@ -150,28 +150,16 @@ async function callOpenAIWhisper(audioData, options = {}) {
   }
 }
 
-/**
- * 生成模拟识别结果（当API密钥未配置时使用）
- */
-function generateMockRecognition(audioData) {
-  const mockTexts = [
-    "Hello, this is a test recognition result.",
-    "How are you today?",
-    "This is a sample speech recognition output.",
-    "Testing the speech recognition functionality.",
-    "Mock audio recognition is working perfectly."
-  ];
-  
-  const randomText = mockTexts[Math.floor(Math.random() * mockTexts.length)];
-  
-  return {
-    text: randomText,
-    duration: Math.floor(Math.random() * 5000 + 1000) // 1-6秒
-  };
-}
+// 注意：已移除所有模拟/降级功能，只使用真实的OpenAI Whisper API
 
 exports.main = async (event, context) => {
-  console.log('语音识别函数被调用');
+  console.log('🎙️ 语音识别函数被调用');
+  console.log('📦 收到的事件数据:', {
+    hasAudio: !!event.audio,
+    hasAudioData: !!event.audioData,
+    language: event.language,
+    format: event.format
+  });
   
   try {
     const { 
@@ -202,56 +190,33 @@ exports.main = async (event, context) => {
 
     let result;
 
-    // 检查是否配置了API密钥
-    if (OPENAI_API_KEY) {
-      try {
-        result = await callOpenAIWhisper(audioInput, { 
-          language, 
-          format, 
-          prompt, 
-          response_format, 
-          temperature 
-        });
-        console.log('OpenAI Whisper成功:', result.text);
-        
-        return {
-          success: true,
-          text: result.text,
-          duration: result.duration,
-          language: result.language,
-          segments: result.segments,
-          method: 'openai-whisper',
-          model: 'whisper-1',
-          timestamp: new Date().toISOString()
-        };
-      } catch (error) {
-        console.error('OpenAI Whisper调用失败:', error.message);
-        // 如果API调用失败，使用模拟识别结果
-        console.log('使用模拟识别作为备选方案');
-        result = generateMockRecognition(audioInput);
-        
-        return {
-          success: true,
-          text: result.text,
-          duration: result.duration,
-          method: 'mock-fallback',
-          note: `OpenAI Whisper调用失败(${error.message})，使用模拟识别结果`,
-          timestamp: new Date().toISOString()
-        };
-      }
-    } else {
-      console.log('未配置OpenAI API密钥，使用模拟识别');
-      result = generateMockRecognition(audioInput);
-      
-      return {
-        success: true,
-        text: result.text,
-        duration: result.duration,
-        method: 'mock',
-        note: '当前使用模拟识别结果，请在CloudBase控制台配置OPENAI_API_KEY以启用真实语音识别',
-        timestamp: new Date().toISOString()
-      };
+    // 检查API密钥配置
+    console.log('🔑 API密钥状态:', OPENAI_API_KEY ? `已设置(${OPENAI_API_KEY.substring(0, 7)}...)` : '未设置');
+    
+    if (!OPENAI_API_KEY) {
+      throw new Error('未配置OpenAI API密钥，请在CloudBase控制台设置OPENAI_API_KEY环境变量');
     }
+
+    result = await callOpenAIWhisper(audioInput, { 
+      language, 
+      format, 
+      prompt, 
+      response_format, 
+      temperature 
+    });
+    
+    console.log('✅ OpenAI Whisper成功:', result.text);
+    
+    return {
+      success: true,
+      text: result.text,
+      duration: result.duration,
+      language: result.language,
+      segments: result.segments,
+      method: 'openai-whisper',
+      model: 'whisper-1',
+      timestamp: new Date().toISOString()
+    };
 
   } catch (error) {
     console.error('语音识别处理错误:', error);

@@ -78,11 +78,6 @@ function App() {
                   <lazyRoutes.UploadPage />
                 </RequireAuth>
               } />
-              <Route path="/settings" element={
-                <RequireAuth>
-                  <lazyRoutes.SettingsPage />
-                </RequireAuth>
-              } />
               <Route path="/voice-assistant" element={
                 <RequireAuth>
                   <lazyRoutes.VoiceAssistantPage />

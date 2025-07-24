@@ -298,14 +298,6 @@ export const lazyRoutes = {
     'StatsPage'
   ),
   
-  SettingsPage: createLazyComponent(
-    () => import('../pages/SettingsPage'),
-    { 
-      fallback: () => <PageLoader text="加载设置页面" />,
-      delay: 100
-    },
-    'SettingsPage'
-  ),
   
   ProfilePage: createLazyComponent(
     () => import('../pages/ProfilePage'),
@@ -428,9 +420,6 @@ export class RoutePreloader {
         break;
       case 'StatsPage':
         preloadComponent(() => import('../pages/StatsPage'));
-        break;
-      case 'SettingsPage':
-        preloadComponent(() => import('../pages/SettingsPage'));
         break;
       case 'ProfilePage':
         preloadComponent(() => import('../pages/ProfilePage'));
