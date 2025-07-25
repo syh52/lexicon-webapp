@@ -8,8 +8,10 @@
     "clean": "rm -rf dist/",
     "build": "npm run clean && vite build",
     "build:fresh": "npm run clean && npm run build",
+    "build:preview": "npm run build && npm run preview",
+    "deploy": "npm run build && cloudbase hosting deploy dist",
     "lint": "eslint .",
-    "preview": "npm run build && vite preview",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
     "start": "serve -s dist -l 3000"
   },
   "dependencies": {
@@ -35,6 +37,8 @@
     "@cloudbase/cli": "^2.7.7",
     "@eslint/js": "^9.25.0",
     "@playwright/test": "^1.54.1",
+    "@stagewise-plugins/react": "^0.6.2",
+    "@stagewise/toolbar-react": "^0.6.2",
     "@types/node": "^24.0.12",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

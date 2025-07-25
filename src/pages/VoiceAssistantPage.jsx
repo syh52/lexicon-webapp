@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Volume2, VolumeX, Play, Square, Settings, Sparkles, MessageCircle, Brain, Headphones, RotateCcw } from 'lucide-react';
-import { getApp, ensureLogin, getCachedLoginState } from '../utils/cloudbase';
+import { getApp, ensureLogin, getCachedLoginState, startKeepAlive, stopKeepAlive, updateActivity } from '../utils/cloudbase';
+import { startWarmup, startKeepAlive as startFunctionKeepAlive, stopKeepAlive as stopFunctionKeepAlive, smartWarmup } from '../utils/functionKeepAlive';
+import { getCachedTTS, cacheTTS } from '../utils/ttsCache';
+import { createConcurrentProcessor, PROCESSING_STAGES } from '../utils/concurrentProcessor';
 import { ttsConfig } from '../config/voiceConfig';
 import AudioRecorder from '../utils/audioRecorder';
 import RealtimeVoiceAssistant from '../components/RealtimeVoiceAssistant';
@@ -21,13 +24,18 @@ const VoiceAssistantPage = () => {
   const [currentVoice, setCurrentVoice] = useState('alloy');
   const [authState, setAuthState] = useState('disconnected');
 
+  // 并发处理相关状态
+  const [processingStage, setProcessingStage] = useState(null);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [isUsingConcurrentMode, setIsUsingConcurrentMode] = useState(true);
+
   // AI模型选项（与设置页面保持一致）
   const AI_MODELS = [
-    { value: 'o3-mini', label: 'O3-Mini', description: '快速响应，适合日常对话' },
-    { value: 'chatgpt-4o-latest', label: 'ChatGPT-4o Latest', description: '最新版本，功能全面' },
-    { value: 'gpt-4.1', label: 'GPT-4.1', description: '高级推理，深度学习' },
-    { value: 'gpt-4.1-nano', label: 'GPT-4.1 Nano', description: '轻量版本，快速响应' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: '经济实用，性能优秀' }
+    { value: 'o3-mini', label: 'O3-Mini' },
+    { value: 'chatgpt-4o-latest', label: 'ChatGPT-4o Latest' },
+    { value: 'gpt-4.1', label: 'GPT-4.1' },
+    { value: 'gpt-4.1-nano', label: 'GPT-4.1 Nano' },
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' }
   ];
 
   // AI助手声音选项（与设置页面保持一致）
@@ -49,6 +57,50 @@ const VoiceAssistantPage = () => {
   const [replayingMessageId, setReplayingMessageId] = useState(null);
 
   const audioRecorderRef = useRef(null);
+  const concurrentProcessorRef = useRef(null);
+
+  // 初始化并发处理器
+  useEffect(() => {
+    if (isUsingConcurrentMode) {
+      concurrentProcessorRef.current = createConcurrentProcessor({
+        feedbackCallbacks: {
+          onStageUpdate: (stage, description) => {
+            setProcessingStage(stage);
+            setCurrentTranscript(description);
+          },
+          onProgressUpdate: (progress) => {
+            setProcessingProgress(progress);
+          },
+          onPartialResult: (partialData) => {
+            console.log('📦 收到部分结果:', partialData);
+            if (partialData.stage === PROCESSING_STAGES.SPEECH_RECOGNITION) {
+              // 语音识别完成，添加用户消息
+              const userMessage = {
+                id: Date.now(),
+                type: 'user', 
+                content: partialData.result,
+                timestamp: new Date().toLocaleTimeString()
+              };
+              setMessages(prev => [...prev, userMessage]);
+            }
+          },
+          onError: (error) => {
+            setError(`处理失败: ${error.message}`);
+            setProcessingStage(null);
+            setProcessingProgress(0);
+          },
+          onComplete: () => {
+            setProcessingStage(null);
+            setProcessingProgress(0);
+            setCurrentTranscript('');
+          }
+        },
+        speechRecognizer: handleSpeechRecognitionCore,
+        aiResponder: handleAIResponseCore,
+        ttsGenerator: handleTextToSpeech
+      });
+    }
+  }, [isUsingConcurrentMode, userLevel, scenario, currentModel]);
 
   // 加载用户设置
   useEffect(() => {
@@ -93,6 +145,14 @@ const VoiceAssistantPage = () => {
           console.log('✅ VoiceAssistant: 认证成功');
           setAuthState('connected');
           setError(''); // 清除之前的错误
+          
+          // 启动连接保活机制
+          startKeepAlive();
+          
+          // 启动云函数预热和保活
+          console.log('🔥 启动云函数预热机制...');
+          startWarmup(); // 预热关键函数
+          startFunctionKeepAlive(); // 启动函数保活
         } else {
           console.log('❌ VoiceAssistant: 认证失败');
           setAuthState('error');
@@ -106,6 +166,12 @@ const VoiceAssistantPage = () => {
     };
     
     initAuth();
+    
+    // 清理函数：组件卸载时停止保活
+    return () => {
+      stopKeepAlive();
+      stopFunctionKeepAlive();
+    };
   }, []);
 
   // 检查麦克风权限
@@ -187,20 +253,30 @@ const VoiceAssistantPage = () => {
         };
 
         recorder.onStop = async (audioData) => {
-          console.log('🛑 录音结束，开始语音识别');
+          console.log('🛑 录音结束，开始处理...');
           setIsRecording(false);
           setStatus(isConnected ? 'connected' : 'disconnected');
-          setCurrentTranscript('正在识别语音...');
           setIsProcessingAudio(true);
 
           try {
-            await handleSpeechRecognition(audioData);
+            if (isUsingConcurrentMode && concurrentProcessorRef.current) {
+              // 使用并发处理器处理语音输入
+              console.log('🚀 启动并发处理模式');
+              await concurrentProcessorRef.current.processVoiceInput(audioData);
+            } else {
+              // 传统串行处理模式
+              console.log('🔄 使用传统串行处理模式');
+              setCurrentTranscript('正在识别语音...');
+              await handleSpeechRecognition(audioData);
+            }
           } catch (error) {
-            console.error('❌ 语音识别失败:', error);
-            setError(`语音识别失败: ${error.message}`);
+            console.error('❌ 语音处理失败:', error);
+            setError(`语音处理失败: ${error.message}`);
           } finally {
             setIsProcessingAudio(false);
-            setCurrentTranscript('');
+            if (!isUsingConcurrentMode) {
+              setCurrentTranscript('');
+            }
           }
         };
 
@@ -236,13 +312,82 @@ const VoiceAssistantPage = () => {
     };
   }, []);
 
+  // 核心语音识别函数（用于并发处理器）
+  const handleSpeechRecognitionCore = async (audioData) => {
+    console.log('🔄 核心语音识别开始');
+    
+    updateActivity();
+    const app = getApp();
+    
+    const formatInfo = audioRecorderRef.current?.getAudioFormat();
+    
+    // 简化版本的语音识别，专注于核心逻辑
+    const result = await app.callFunction({
+      name: 'speech-recognition',
+      data: {
+        audioData: audioData.base64Audio,
+        language: 'auto',
+        format: formatInfo?.format || 'webm',
+        response_format: 'json',
+        temperature: 0
+      },
+      timeout: 45000
+    });
+
+    if (result.result && result.result.success && result.result.text) {
+      return result.result.text.trim();
+    } else {
+      const errorInfo = result.result?.error;
+      throw new Error(typeof errorInfo === 'string' ? errorInfo : '语音识别失败');
+    }
+  };
+
+  // 核心AI响应函数（用于并发处理器）
+  const handleAIResponseCore = async (userInput) => {
+    console.log('🤖 核心AI响应开始');
+    
+    updateActivity();
+    const app = getApp();
+
+    const result = await app.callFunction({
+      name: 'ai-chat',
+      data: {
+        messages: [{ role: 'user', content: userInput }],
+        userLevel: userLevel,
+        scenario: scenario,
+        model: currentModel
+      },
+      timeout: 60000
+    });
+
+    if (result.result && result.result.success && result.result.response) {
+      const aiResponse = result.result.response.trim();
+      
+      // 添加AI消息到对话记录
+      const aiMessage = {
+        id: Date.now() + 1,
+        type: 'assistant',
+        content: aiResponse,
+        timestamp: new Date().toLocaleTimeString(),
+        model: currentModel,
+        method: result.result.method
+      };
+      setMessages(prev => [...prev, aiMessage]);
+
+      return aiResponse;
+    } else {
+      const errorMsg = result.result?.error || 'AI服务失败';
+      throw new Error(errorMsg);
+    }
+  };
+
   // 处理语音识别 - 调用 OpenAI Whisper API
   const handleSpeechRecognition = async (audioData) => {
     console.log('🔄 开始调用 OpenAI Whisper API 进行语音识别');
     
     try {
-      // 确保已认证
-      await ensureLogin();
+      // 更新活动时间戳（移除重复的认证调用）
+      updateActivity();
       const app = getApp();
 
       // 获取音频格式信息
@@ -368,8 +513,8 @@ const VoiceAssistantPage = () => {
         authState
       });
 
-      // 确保已认证
-      await ensureLogin();
+      // 更新活动时间戳（移除重复的认证调用）
+      updateActivity();
       const app = getApp();
 
       // 调用ai-chat云函数（增加超时设置）
@@ -502,6 +647,10 @@ const VoiceAssistantPage = () => {
 
     try {
       setError('');
+      
+      // 智能预热：用户开始录音时预热语音助手相关函数
+      smartWarmup('voice-assistant');
+      
       audioRecorderRef.current.startRecording();
     } catch (error) {
       console.error('启动录音失败:', error);
@@ -526,8 +675,8 @@ const VoiceAssistantPage = () => {
     setStatus('disconnected');
   };
 
-  // 文本转语音处理 - 优先使用云函数TTS，降级到浏览器TTS
-  const handleTextToSpeech = async (text, messageId = null) => {
+  // 文本转语音处理 - 支持缓存的TTS
+  const handleTextToSpeech = async (text, messageId = null, voiceOverride = null) => {
     if (!text || text.trim().length === 0) return;
     
     setIsPlaying(true);
@@ -537,27 +686,61 @@ const VoiceAssistantPage = () => {
     console.log('🔊 开始TTS语音合成:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
     
     try {
-      // 优先尝试云函数TTS服务
-      await ensureLogin();
-      const app = getApp();
+      // 更新活动时间戳
+      updateActivity();
       
       // 使用用户选择的声音设置
       const ttsSettings = ttsConfig.scenarios.conversation;
+      const voice = voiceOverride || currentVoice;
+      const speed = ttsSettings.speed;
+      const model = ttsSettings.model;
+      
+      // 首先检查缓存
+      const cachedAudio = getCachedTTS(text, voice, speed, model);
+      if (cachedAudio) {
+        console.log('🎯 使用缓存的TTS音频');
+        
+        // 播放缓存的音频
+        const audioData = `data:audio/mp3;base64,${cachedAudio}`;
+        const audio = new Audio(audioData);
+        
+        audio.onended = () => {
+          setIsPlaying(false);
+          setReplayingMessageId(null);
+          console.log('🔊 缓存TTS播放完成');
+        };
+        
+        audio.onerror = (error) => {
+          console.error('缓存音频播放失败:', error);
+          setIsPlaying(false);
+          setReplayingMessageId(null);
+        };
+
+        await audio.play();
+        return;
+      }
+      
+      // 缓存未命中，调用云函数TTS
+      console.log('💫 缓存未命中，调用云函数TTS');
+      const app = getApp();
       
       const result = await app.callFunction({
         name: 'text-to-speech',
         data: {
           text: text,
-          voice: currentVoice, // 使用用户选择的声音
-          speed: ttsSettings.speed,
+          voice: voice,
+          speed: speed,
           format: ttsConfig.default.format,
-          model: ttsSettings.model
+          model: model
         },
         timeout: 30000 // TTS一般比较快，30秒超时足够
       });
 
       if (result.result && result.result.success && result.result.audio) {
         console.log('✅ 云函数TTS成功，音频长度:', result.result.audio.length);
+        
+        // 缓存TTS结果
+        cacheTTS(text, voice, speed, model, result.result.audio);
         
         // 播放云函数返回的音频
         const audioData = `data:audio/mp3;base64,${result.result.audio}`;
@@ -573,8 +756,6 @@ const VoiceAssistantPage = () => {
           console.error('音频播放失败:', error);
           setIsPlaying(false);
           setReplayingMessageId(null);
-          // 降级到浏览器TTS
-          fallbackToSpeechSynthesis(text);
         };
 
         await audio.play();
@@ -614,8 +795,8 @@ const VoiceAssistantPage = () => {
       
       const startTime = Date.now();
       
-      // 确保已认证
-      await ensureLogin();
+      // 更新活动时间戳（移除重复的认证调用）
+      updateActivity();
       const app = getApp();
       
       // 调用云函数进行API测试（增加超时设置）
@@ -796,6 +977,27 @@ const VoiceAssistantPage = () => {
                     <span className="text-orange-200 font-medium">{currentTranscript}</span>
                     {isRecording && <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>}
                   </div>
+                  
+                  {/* 并发处理进度条 */}
+                  {isUsingConcurrentMode && processingProgress > 0 && (
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs text-orange-300 mb-1">
+                        <span>处理进度</span>
+                        <span>{Math.round(processingProgress * 100)}%</span>
+                      </div>
+                      <div className="w-full bg-orange-500/20 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-orange-500 to-yellow-500 h-2 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${processingProgress * 100}%` }}
+                        ></div>
+                      </div>
+                      {processingStage && (
+                        <div className="text-xs text-orange-300 mt-1 opacity-75">
+                          阶段: {processingStage}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1004,39 +1206,66 @@ const VoiceAssistantPage = () => {
                               setCurrentVoice(voice.value);
                               localStorage.setItem('ai-voice', voice.value);
                               window.dispatchEvent(new Event('settingsChanged'));
+                              // 直接播放试听声音，使用指定的声音
+                              handleTextToSpeech(`你好，这是 ${voice.label} 的声音测试。`, `test-${voice.value}`, voice.value);
                             }}
+                            disabled={replayingMessageId === `test-${voice.value}`}
                             className={`w-full p-3 rounded-lg border-2 transition-all text-left btn-enhanced ${
                               currentVoice === voice.value
                                 ? 'border-orange-500/50 bg-orange-500/20'
                                 : 'border-white/20 hover:border-white/40'
-                            }`}
+                            } ${replayingMessageId === `test-${voice.value}` ? 'opacity-75 cursor-not-allowed' : ''}`}
                           >
                             <div className="flex items-center justify-between">
                               <div>
                                 <h4 className="font-medium text-sm text-white">{voice.label}</h4>
                                 <p className="text-xs text-gray-400">{voice.description}</p>
                               </div>
-                              {currentVoice === voice.value && (
-                                <div className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center">
-                                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                </div>
-                              )}
+                              <div className="flex items-center space-x-2">
+                                {replayingMessageId === `test-${voice.value}` && (
+                                  <RotateCcw className="w-4 h-4 text-orange-400 animate-spin" />
+                                )}
+                                {currentVoice === voice.value && (
+                                  <div className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </button>
-                          <button
-                            onClick={() => handleTextToSpeech(`你好，这是 ${voice.label} 的声音测试。`, `test-${voice.value}`)}
-                            disabled={replayingMessageId === `test-${voice.value}`}
-                            className="absolute top-1 right-1 p-1 rounded-full bg-white/10 hover:bg-white/20 transition-colors shadow-sm"
-                            title="试听声音"
-                          >
-                            {replayingMessageId === `test-${voice.value}` ? (
-                              <RotateCcw className="w-3 h-3 text-orange-400 animate-spin" />
-                            ) : (
-                              <Play className="w-3 h-3 text-gray-300" />
-                            )}
-                          </button>
+
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* 处理模式切换 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-3">
+                      处理模式
+                      <span className="text-xs text-gray-400 ml-2">(实验性功能)</span>
+                    </label>
+                    <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                      <div>
+                        <div className="text-sm font-medium text-white">
+                          {isUsingConcurrentMode ? '并发处理模式' : '传统串行模式'}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {isUsingConcurrentMode 
+                            ? '智能预热 + 流式反馈，响应更快' 
+                            : '传统处理方式，稳定可靠'
+                          }
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={isUsingConcurrentMode}
+                          onChange={(e) => setIsUsingConcurrentMode(e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                      </label>
                     </div>
                   </div>
 

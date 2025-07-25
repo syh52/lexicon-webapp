@@ -4,6 +4,8 @@ import { AuthProvider } from './contexts/AuthContext'
 import RequireAuth from './components/auth/RequireAuth'
 import { lazyRoutes } from './utils/lazyLoader'
 import AppLayout from './components/layout/AppLayout'
+import { StagewiseToolbar } from '@stagewise/toolbar-react'
+import ReactPlugin from '@stagewise-plugins/react'
 import './App.css'
 
 // 简单的错误边界组件
@@ -89,6 +91,11 @@ function App() {
           </AppLayout>
         </Router>
       </AuthProvider>
+      <StagewiseToolbar 
+        config={{
+          plugins: [ReactPlugin]
+        }}
+      />
     </ErrorBoundary>
   )
 }

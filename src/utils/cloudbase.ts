@@ -36,6 +36,13 @@ let initPromise: Promise<any> | null = null;
 let isLoggedIn = false;
 let loginPromise: Promise<LoginState> | null = null;
 
+// 连接保活相关
+let keepAliveTimer: NodeJS.Timeout | null = null;
+let lastActivity = Date.now();
+const KEEP_ALIVE_INTERVAL = 5 * 60 * 1000; // 5分钟
+const AUTH_CACHE_DURATION = 10 * 60 * 1000; // 10分钟
+let lastAuthCheck = 0;
+
 /**
  * 初始化云开发实例（单例模式）
  * @param config - 初始化配置
@@ -154,12 +161,16 @@ export const signInAnonymously = async (): Promise<LoginState> => {
 };
 
 /**
- * 确保已登录（如未登录则执行匿名登录）- 优化版本
+ * 确保已登录（如未登录则执行匿名登录）- 智能缓存优化版本
  * @returns 登录状态
  */
 export const ensureLogin = async (): Promise<LoginState> => {
-  // 如果有缓存的登录状态，直接返回
-  if (globalLoginState && globalLoginState.isLoggedIn) {
+  // 更新活动时间
+  updateActivity();
+  
+  // 如果有有效的缓存登录状态且不需要重新认证，直接返回
+  if (globalLoginState && globalLoginState.isLoggedIn && !shouldReauth()) {
+    console.log('🚀 使用缓存的登录状态');
     return globalLoginState;
   }
   
@@ -193,9 +204,10 @@ export const ensureLogin = async (): Promise<LoginState> => {
         console.log('✅ 用户已登录');
       }
       
-      // 缓存登录状态
+      // 缓存登录状态并更新检查时间
       globalLoginState = loginState;
       isLoggedIn = true;
+      lastAuthCheck = Date.now();
       
       return loginState;
     } catch (error) {
@@ -228,6 +240,66 @@ export const getCachedLoginState = (): LoginState | null => {
   return globalLoginState;
 };
 
+/**
+ * 连接保活 - 定期调用轻量级API保持连接活跃
+ */
+const keepConnectionAlive = async (): Promise<void> => {
+  try {
+    lastActivity = Date.now();
+    const auth = getAuth();
+    // 轻量级的状态检查，不执行登录操作
+    await auth.getLoginState();
+    console.log('🔄 CloudBase连接保活成功');
+  } catch (error) {
+    console.warn('⚠️ 连接保活失败:', error);
+    // 保活失败时清除缓存，强制下次重新认证
+    globalLoginState = null;
+    isLoggedIn = false;
+  }
+};
+
+/**
+ * 启动连接保活机制
+ */
+export const startKeepAlive = (): void => {
+  if (keepAliveTimer) {
+    clearInterval(keepAliveTimer);
+  }
+  
+  keepAliveTimer = setInterval(keepConnectionAlive, KEEP_ALIVE_INTERVAL);
+  console.log('✅ CloudBase连接保活已启动');
+};
+
+/**
+ * 停止连接保活机制
+ */
+export const stopKeepAlive = (): void => {
+  if (keepAliveTimer) {
+    clearInterval(keepAliveTimer);
+    keepAliveTimer = null;
+    console.log('🛑 CloudBase连接保活已停止');
+  }
+};
+
+/**
+ * 更新活动时间戳
+ */
+export const updateActivity = (): void => {
+  lastActivity = Date.now();
+};
+
+/**
+ * 智能认证缓存 - 根据时间和活动状态决定是否需要重新检查
+ */
+const shouldReauth = (): boolean => {
+  const now = Date.now();
+  const timeSinceLastCheck = now - lastAuthCheck;
+  const timeSinceActivity = now - lastActivity;
+  
+  // 如果距离上次检查超过缓存时间，或者长时间无活动，则重新认证
+  return timeSinceLastCheck > AUTH_CACHE_DURATION || timeSinceActivity > KEEP_ALIVE_INTERVAL;
+};
+
 // 默认导出
 export default {
   init,
@@ -241,5 +313,8 @@ export default {
   signInAnonymously,
   ensureLogin,
   clearCache,
-  getCachedLoginState
+  getCachedLoginState,
+  startKeepAlive,
+  stopKeepAlive,
+  updateActivity
 };

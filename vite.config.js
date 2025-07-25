@@ -5,7 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/', // 部署到根目录
+  base: './', // 使用相对路径，适配静态托管CDN
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
@@ -39,9 +39,15 @@ export default defineConfig({
         }
       }
     },
-    // 性能优化
+    // 性能优化 - CloudBase静态托管最佳实践
     chunkSizeWarningLimit: 1000,
-    reportCompressedSize: false
+    reportCompressedSize: false,
+    // 启用压缩和优化
+    cssCodeSplit: true,
+    // 预加载配置
+    modulePreload: {
+      polyfill: false
+    }
   },
   server: {
     host: '127.0.0.1',  // 开发环境使用IP地址
