@@ -193,54 +193,58 @@ export const generateMemoryTechnique = tool({
  */
 export const scheduleReview = tool({
   name: 'scheduleReview',
-  description: '基于FSRS算法为学习内容安排最优复习时间',
+  description: '基于SM2算法为学习内容安排最优复习时间',
   parameters: z.object({
     itemId: z.string().describe('学习项目ID'),
     itemType: z.string().describe('学习项目类型：word, phrase, grammar'),
-    difficulty: z.number().min(1).max(5).describe('难度评级1-5'),
-    lastReview: z.string().optional().describe('上次复习时间'),
-    performance: z.number().min(0).max(4).describe('学习表现评分0-4')
+    performance: z.enum(['know', 'hint', 'unknown']).describe('学习表现：know-认识, hint-提示后认识, unknown-不认识')
   }),
   execute: async (input) => {
     try {
-      // 简化的FSRS算法实现
-      const now = new Date();
-      const difficultyMultiplier = input.difficulty / 5;
-      const performanceBonus = (input.performance / 4) * 0.5;
-      
-      // 基础间隔（小时）
-      let intervalHours = 1;
-      if (input.lastReview) {
-        const lastDate = new Date(input.lastReview);
-        const daysSince = (now - lastDate) / (1000 * 60 * 60 * 24);
-        intervalHours = Math.max(1, daysSince * (2 - difficultyMultiplier + performanceBonus));
+      // 使用SM2算法安排复习
+      const response = await app.callFunction({
+        name: 'sm2-service',
+        data: {
+          action: 'schedule_review',
+          itemId: input.itemId,
+          itemType: input.itemType,
+          choice: input.performance
+        }
+      });
+
+      if (response.result?.success) {
+        return {
+          itemId: input.itemId,
+          nextReviewTime: response.result.nextReview,
+          intervalDays: response.result.intervalDays,
+          message: `已安排 ${response.result.intervalDays} 天后复习这个内容。`
+        };
+      } else {
+        // 降级处理：简单的间隔计算
+        const now = new Date();
+        let intervalDays = 1;
+        
+        switch (input.performance) {
+          case 'know':
+            intervalDays = 3;
+            break;
+          case 'hint':
+            intervalDays = 1;
+            break;
+          case 'unknown':
+            intervalDays = 1;
+            break;
+        }
+        
+        const nextReview = new Date(now.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+        
+        return {
+          itemId: input.itemId,
+          nextReviewTime: nextReview.toISOString(),
+          intervalDays: intervalDays,
+          message: `已安排 ${intervalDays} 天后复习这个内容。`
+        };
       }
-
-      const nextReview = new Date(now.getTime() + intervalHours * 60 * 60 * 1000);
-
-      // 保存到数据库
-      try {
-        await app.callFunction({
-          name: 'learning-tracker',
-          data: {
-            action: 'schedule_review',
-            itemId: input.itemId,
-            itemType: input.itemType,
-            nextReview: nextReview.toISOString(),
-            difficulty: input.difficulty,
-            performance: input.performance
-          }
-        });
-      } catch (dbError) {
-        console.warn('Failed to save review schedule:', dbError);
-      }
-
-      return {
-        itemId: input.itemId,
-        nextReviewTime: nextReview.toISOString(),
-        intervalHours: Math.round(intervalHours * 10) / 10,
-        message: `已安排 ${Math.round(intervalHours)} 小时后复习这个内容。`
-      };
     } catch (error) {
       return {
         itemId: input.itemId,

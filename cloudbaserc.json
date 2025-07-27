@@ -4,13 +4,23 @@
   "envId": "cloud1-7g7oatv381500c81",
   "framework": {
     "name": "lexicon-webapp",
+    "description": "Lexicon智能英语学习平台 - 集成SM2算法背单词、AI语音助手、实时对话的现代化英语学习应用",
     "plugins": {
       "client": {
         "use": "@cloudbase/framework-plugin-website",
         "inputs": {
           "buildCommand": "npm run build",
           "outputPath": "dist",
-          "cloudPath": "/"
+          "cloudPath": "/",
+          "ignore": [
+            "node_modules/**/*",
+            ".git/**/*",
+            "src/**/*",
+            "docs/**/*",
+            "scripts/**/*",
+            "*.md",
+            "*.sh"
+          ]
         }
       }
     }
@@ -18,6 +28,7 @@
   "functions": [
     {
       "name": "ai-chat",
+      "description": "AI对话服务 - 基于GPT-4o-mini的智能对话功能",
       "source": "cloudfunctions/ai-chat",
       "entry": "index.js",
       "runtime": "Nodejs18.15",
@@ -31,7 +42,8 @@
       }
     },
     {
-      "name": "speech-recognition", 
+      "name": "speech-recognition",
+      "description": "语音识别服务 - 基于OpenAI Whisper的高精度语音转文本",
       "source": "cloudfunctions/speech-recognition",
       "entry": "index.js",
       "runtime": "Nodejs18.15",
@@ -43,6 +55,7 @@
     },
     {
       "name": "text-to-speech",
+      "description": "语音合成服务 - 基于OpenAI TTS的自然语音播放",
       "source": "cloudfunctions/text-to-speech", 
       "entry": "index.js",
       "runtime": "Nodejs18.15",
@@ -54,6 +67,7 @@
     },
     {
       "name": "realtime-proxy",
+      "description": "实时语音代理 - OpenAI Realtime API代理服务，支持毫秒级语音交互",
       "source": "cloudfunctions/realtime-proxy",
       "entry": "index.js",
       "runtime": "Nodejs18.15",
@@ -64,6 +78,7 @@
     },
     {
       "name": "dictionary-lookup",
+      "description": "词典查询服务 - 提供单词释义、音标、例句等信息",
       "source": "cloudfunctions/dictionary-lookup",
       "entry": "index.js",
       "runtime": "Nodejs18.15",
@@ -71,7 +86,24 @@
     },
     {
       "name": "learning-tracker",
+      "description": "学习进度追踪 - 基于SM2算法记录用户学习行为和进度数据",
       "source": "cloudfunctions/learning-tracker",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true
+    },
+    {
+      "name": "sm2-service",
+      "description": "SM2算法服务 - SuperMemo间隔重复算法的云端处理服务",
+      "source": "cloudfunctions/sm2-service",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true
+    },
+    {
+      "name": "voice-assistant",
+      "description": "语音助手服务 - AI语音助手的云端处理服务",
+      "source": "cloudfunctions/voice-assistant",
       "entry": "index.js",
       "runtime": "Nodejs18.15",
       "installDependency": true

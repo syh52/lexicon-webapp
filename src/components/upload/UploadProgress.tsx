@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import { Progress } from '@/components/ui/Progress';
 
 interface UploadProgressProps {
   progress: number;

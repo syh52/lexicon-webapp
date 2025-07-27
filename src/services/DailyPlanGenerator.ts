@@ -1,5 +1,7 @@
 import { UserSettings } from './userSettingsService';
-import { SimpleWordRecord, WORD_STATUS } from '../utils/simpleReviewAlgorithm';
+import { SM2Card, SM2CardStatus, StudyChoice } from '../types';
+import { SM2Service } from './sm2Service';
+import { isSM2CardDue, getSM2MasteryLevel } from '../utils/sm2Algorithm';
 
 // 每日学习计划接口
 export interface DailyStudyPlan {
@@ -19,12 +21,20 @@ export interface DailyStudyPlan {
   currentIndex: number;
   completedCount: number;
   
-  // 学习统计
+  // 学习统计 - 扩展支持SM-2
   stats: {
     knownCount: number;
     unknownCount: number;
+    hintCount?: number; // SM-2新增：提示次数
     studyTime: number;
     accuracy: number;
+    // SM-2专用统计
+    choiceStats?: {
+      knowCount: number;
+      hintCount: number;
+      unknownCount: number;
+    };
+    repeatCount?: number; // 当日重复次数
   };
   
   // 状态信息
@@ -36,7 +46,7 @@ export interface DailyStudyPlan {
   updatedAt?: Date;
 }
 
-// 单词优先级评分接口
+// 单词优先级评分接口 - 扩展支持SM-2
 interface WordPriority {
   wordId: string;
   word: string;
@@ -45,180 +55,191 @@ interface WordPriority {
   dueDate?: Date;
   lastReview?: Date;
   failureCount?: number;
+  // SM-2扩展字段
+  sm2Card?: SM2Card;
+  masteryLevel?: number; // 掌握程度
+  EF?: number; // 易记因子
 }
 
 export class DailyPlanGenerator {
+  private static sm2Service = new SM2Service();
+
   /**
-   * 生成每日学习计划
+   * 生成每日学习计划 - 使用SM2算法
    */
-  static generateDailyPlan(
+  static async generateDailyPlan(
     userId: string,
     wordbookId: string,
     userSettings: UserSettings,
     allWords: any[],
-    userStudyRecords: any[],
     date: string = new Date().toISOString().split('T')[0]
-  ): DailyStudyPlan {
-    // 1. 转换为SimpleWordRecord格式
-    const wordRecords = this.convertToWordRecords(allWords, userStudyRecords);
-    
-    // 2. 分类和优先级排序
-    const { newWords, reviewWords, overdueWords } = this.categorizeWords(wordRecords);
-    
-    // 3. 计算优先级评分
-    const prioritizedWords = this.calculatePriorities(newWords, reviewWords, overdueWords);
-    
-    // 4. 根据用户设置选择单词
-    const selectedWords = this.selectWordsForPlan(prioritizedWords, userSettings);
-    
-    // 5. 生成最终计划
-    const plan: DailyStudyPlan = {
-      userId,
-      wordbookId,
-      date,
-      plannedWords: selectedWords.map(w => w.wordId),
-      totalCount: selectedWords.length,
-      newWordsCount: selectedWords.filter(w => w.type === 'new').length,
-      reviewWordsCount: selectedWords.filter(w => w.type === 'review' || w.type === 'overdue').length,
-      completedWords: [],
-      currentIndex: 0,
-      completedCount: 0,
-      stats: {
-        knownCount: 0,
-        unknownCount: 0,
-        studyTime: 0,
-        accuracy: 0
-      },
-      isCompleted: false,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    return plan;
+  ): Promise<DailyStudyPlan> {
+    // 直接使用SM2算法生成计划
+    return this.generateSM2DailyPlan(userId, wordbookId, userSettings, allWords, date);
   }
 
   /**
-   * 转换为SimpleWordRecord格式
+   * 使用SM-2算法生成每日学习计划 - 新方法
    */
-  private static convertToWordRecords(allWords: any[], userStudyRecords: any[]): SimpleWordRecord[] {
-    const userRecordMap = new Map();
-    
-    // 构建用户学习记录映射
-    userStudyRecords.forEach(record => {
-      userRecordMap.set(record.wordId, record);
-    });
-    
-    // 转换所有单词
-    return allWords.map(word => {
-      const userRecord = userRecordMap.get(word._id);
+  static async generateSM2DailyPlan(
+    userId: string,
+    wordbookId: string,
+    userSettings: UserSettings,
+    allWords: any[],
+    date: string = new Date().toISOString().split('T')[0]
+  ): Promise<DailyStudyPlan> {
+    try {
+      // 1. 获取用户的SM-2卡片
+      const sm2Cards = await this.sm2Service.getUserSM2Records(userId, wordbookId);
       
-      if (userRecord) {
-        // 已有学习记录，恢复状态
-        const wordRecord = new SimpleWordRecord(word._id, word.word);
-        wordRecord.stage = userRecord.stage || 0;
-        wordRecord.nextReview = new Date(userRecord.nextReview || Date.now());
-        wordRecord.failures = userRecord.failures || 0;
-        wordRecord.successes = userRecord.successes || 0;
-        wordRecord.lastReview = userRecord.lastReview ? new Date(userRecord.lastReview) : null;
-        wordRecord.status = userRecord.status || WORD_STATUS.new;
-        wordRecord.createdAt = userRecord.createdAt ? new Date(userRecord.createdAt) : new Date();
-        wordRecord.updateStatus();
-        return wordRecord;
-      } else {
-        // 新单词
-        return new SimpleWordRecord(word._id, word.word);
-      }
-    });
+      // 2. 创建单词映射
+      const wordMap = new Map(allWords.map(word => [word._id, word]));
+      
+      // 3. 为新单词创建SM-2卡片
+      const existingCardIds = new Set(sm2Cards.map(card => card.wordId));
+      const newWordIds = allWords
+        .map(word => word._id)
+        .filter(wordId => !existingCardIds.has(wordId));
+      
+      // 4. 分类SM-2卡片
+      const prioritizedWords = this.categorizeSM2Cards(sm2Cards, newWordIds, wordMap);
+      
+      // 5. 根据用户设置选择单词
+      const selectedWords = this.selectWordsForSM2Plan(prioritizedWords, userSettings);
+      
+      // 6. 生成最终计划
+      const plan: DailyStudyPlan = {
+        userId,
+        wordbookId,
+        date,
+        plannedWords: selectedWords.map(w => w.wordId),
+        totalCount: selectedWords.length,
+        newWordsCount: selectedWords.filter(w => w.type === 'new').length,
+        reviewWordsCount: selectedWords.filter(w => w.type === 'review' || w.type === 'overdue').length,
+        completedWords: [],
+        currentIndex: 0,
+        completedCount: 0,
+        stats: {
+          knownCount: 0,
+          unknownCount: 0,
+          hintCount: 0,
+          studyTime: 0,
+          accuracy: 0,
+          choiceStats: {
+            knowCount: 0,
+            hintCount: 0,
+            unknownCount: 0
+          },
+          repeatCount: 0
+        },
+        isCompleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      return plan;
+    } catch (error) {
+      console.error('生成SM-2每日计划失败:', error);
+      // 返回空计划作为降级处理
+      return {
+        userId,
+        wordbookId,
+        date,
+        plannedWords: [],
+        totalCount: 0,
+        newWordsCount: 0,
+        reviewWordsCount: 0,
+        completedWords: [],
+        currentIndex: 0,
+        completedCount: 0,
+        stats: {
+          knownCount: 0,
+          unknownCount: 0,
+          hintCount: 0,
+          studyTime: 0,
+          accuracy: 0,
+          choiceStats: {
+            knowCount: 0,
+            hintCount: 0,
+            unknownCount: 0
+          },
+          repeatCount: 0
+        },
+        isCompleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+    }
   }
 
-  /**
-   * 分类单词
-   */
-  private static categorizeWords(wordRecords: SimpleWordRecord[]): {
-    newWords: SimpleWordRecord[];
-    reviewWords: SimpleWordRecord[];
-    overdueWords: SimpleWordRecord[];
-  } {
-    const now = new Date();
-    const newWords: SimpleWordRecord[] = [];
-    const reviewWords: SimpleWordRecord[] = [];
-    const overdueWords: SimpleWordRecord[] = [];
-    
-    wordRecords.forEach(record => {
-      if (record.status === WORD_STATUS.new) {
-        newWords.push(record);
-      } else if (record.status === WORD_STATUS.mastered) {
-        // 已掌握的单词暂时不加入学习计划
-        return;
-      } else if (record.isDueForReview()) {
-        // 计算过期时间
-        const overdueDays = Math.floor((now.getTime() - record.nextReview.getTime()) / (24 * 60 * 60 * 1000));
-        if (overdueDays > 1) {
-          overdueWords.push(record);
-        } else {
-          reviewWords.push(record);
-        }
-      }
-    });
-    
-    return { newWords, reviewWords, overdueWords };
-  }
 
   /**
-   * 计算单词优先级
+   * 分类SM-2卡片 - 新方法
    */
-  private static calculatePriorities(
-    newWords: SimpleWordRecord[],
-    reviewWords: SimpleWordRecord[],
-    overdueWords: SimpleWordRecord[]
+  private static categorizeSM2Cards(
+    sm2Cards: SM2Card[], 
+    newWordIds: string[], 
+    wordMap: Map<string, any>
   ): WordPriority[] {
     const now = new Date();
     const priorities: WordPriority[] = [];
     
-    // 过期单词 - 最高优先级
-    overdueWords.forEach(word => {
-      const overdueDays = Math.floor((now.getTime() - word.nextReview.getTime()) / (24 * 60 * 60 * 1000));
-      const failurePenalty = word.failures * 0.2;
-      const priority = 1000 + overdueDays * 10 + failurePenalty;
+    // 处理现有的SM-2卡片
+    sm2Cards.forEach(card => {
+      const word = wordMap.get(card.wordId);
+      if (!word) return;
+      
+      const masteryLevel = getSM2MasteryLevel(card);
+      let priority = 0;
+      let type: 'new' | 'review' | 'overdue' = 'review';
+      
+      if (card.status === SM2CardStatus.Mastered && masteryLevel >= 90) {
+        // 已充分掌握的单词，优先级最低
+        priority = 10;
+      } else if (isSM2CardDue(card, now)) {
+        // 到期需要复习的卡片
+        const overdueDays = Math.max(0, Math.floor((now.getTime() - card.nextReview.getTime()) / (24 * 60 * 60 * 1000)));
+        
+        if (overdueDays > 1) {
+          // 过期单词 - 最高优先级
+          type = 'overdue';
+          priority = 1000 + overdueDays * 20 + (100 - masteryLevel) * 5;
+        } else {
+          // 正常到期单词 - 中等优先级
+          type = 'review';
+          priority = 500 + (100 - masteryLevel) * 3 + (3.0 - card.EF) * 50;
+        }
+      } else {
+        // 尚未到期，优先级很低
+        priority = 50 + (100 - masteryLevel) * 0.5;
+      }
       
       priorities.push({
-        wordId: word.wordId,
+        wordId: card.wordId,
         word: word.word,
         priority,
-        type: 'overdue',
-        dueDate: word.nextReview,
-        lastReview: word.lastReview,
-        failureCount: word.failures
+        type,
+        dueDate: card.nextReview,
+        lastReview: card.lastReview,
+        failureCount: Math.max(0, card.repetitions === 0 ? 1 : 0),
+        sm2Card: card,
+        masteryLevel,
+        EF: card.EF
       });
     });
     
-    // 复习单词 - 中等优先级
-    reviewWords.forEach(word => {
-      const daysSinceLastReview = word.lastReview ? 
-        Math.floor((now.getTime() - word.lastReview.getTime()) / (24 * 60 * 60 * 1000)) : 0;
-      const failurePenalty = word.failures * 0.1;
-      const priority = 500 + daysSinceLastReview * 5 + failurePenalty;
+    // 处理新单词
+    newWordIds.forEach(wordId => {
+      const word = wordMap.get(wordId);
+      if (!word) return;
       
       priorities.push({
-        wordId: word.wordId,
+        wordId,
         word: word.word,
-        priority,
-        type: 'review',
-        dueDate: word.nextReview,
-        lastReview: word.lastReview,
-        failureCount: word.failures
-      });
-    });
-    
-    // 新单词 - 基础优先级
-    newWords.forEach(word => {
-      const priority = 100 + Math.random() * 50; // 随机化避免总是相同顺序
-      
-      priorities.push({
-        wordId: word.wordId,
-        word: word.word,
-        priority,
-        type: 'new'
+        priority: 200 + Math.random() * 50, // 新单词基础优先级
+        type: 'new',
+        masteryLevel: 0,
+        EF: 2.5
       });
     });
     
@@ -227,20 +248,31 @@ export class DailyPlanGenerator {
   }
 
   /**
-   * 根据用户设置选择单词
+   * 为SM-2计划选择单词 - 新方法
    */
-  private static selectWordsForPlan(
+  private static selectWordsForSM2Plan(
     prioritizedWords: WordPriority[],
     userSettings: UserSettings
   ): WordPriority[] {
     const selectedWords: WordPriority[] = [];
     
-    // 1. 优先选择过期和复习单词
-    const overdueAndReviewWords = prioritizedWords.filter(w => w.type === 'overdue' || w.type === 'review');
-    const selectedReviewWords = overdueAndReviewWords.slice(0, userSettings.dailyReviewWords);
-    selectedWords.push(...selectedReviewWords);
+    // 1. 优先选择过期和急需复习的单词
+    const urgentWords = prioritizedWords.filter(w => 
+      w.type === 'overdue' || (w.type === 'review' && w.priority > 600)
+    );
+    const selectedUrgent = urgentWords.slice(0, Math.ceil(userSettings.dailyReviewWords * 0.7));
+    selectedWords.push(...selectedUrgent);
     
-    // 2. 如果复习单词不足，用新单词补充
+    // 2. 添加正常复习单词
+    const remainingReviewSlots = userSettings.dailyReviewWords - selectedWords.length;
+    if (remainingReviewSlots > 0) {
+      const normalReviewWords = prioritizedWords.filter(w => 
+        w.type === 'review' && !selectedWords.includes(w)
+      );
+      selectedWords.push(...normalReviewWords.slice(0, remainingReviewSlots));
+    }
+    
+    // 3. 添加新单词
     const remainingSlots = userSettings.dailyTarget - selectedWords.length;
     if (remainingSlots > 0) {
       const newWords = prioritizedWords.filter(w => w.type === 'new');
@@ -248,26 +280,27 @@ export class DailyPlanGenerator {
       selectedWords.push(...newWords.slice(0, newWordsToAdd));
     }
     
-    // 3. 如果仍有空位，继续添加新单词
+    // 4. 如果还有空位，优先填充掌握度较低的单词
     const stillRemaining = userSettings.dailyTarget - selectedWords.length;
     if (stillRemaining > 0) {
-      const newWords = prioritizedWords.filter(w => w.type === 'new');
-      const alreadySelectedNewWords = selectedWords.filter(w => w.type === 'new').length;
-      const additionalNewWords = newWords.slice(alreadySelectedNewWords, alreadySelectedNewWords + stillRemaining);
-      selectedWords.push(...additionalNewWords);
+      const remainingWords = prioritizedWords.filter(w => 
+        !selectedWords.includes(w) && w.masteryLevel < 80
+      );
+      selectedWords.push(...remainingWords.slice(0, stillRemaining));
     }
     
     return selectedWords;
   }
 
   /**
-   * 更新学习计划进度
+   * 更新学习计划进度 - 支持SM-2
    */
   static updatePlanProgress(
     plan: DailyStudyPlan,
     completedWordId: string,
     isKnown: boolean,
-    studyTime: number = 0
+    studyTime: number = 0,
+    choice?: StudyChoice
   ): DailyStudyPlan {
     const updatedPlan = { ...plan };
     
@@ -287,14 +320,42 @@ export class DailyPlanGenerator {
       } else {
         updatedPlan.stats.unknownCount++;
       }
+      
+      // SM-2扩展统计
+      if (choice && updatedPlan.stats.choiceStats) {
+        switch (choice) {
+          case StudyChoice.Know:
+            updatedPlan.stats.choiceStats.knowCount++;
+            break;
+          case StudyChoice.Hint:
+            updatedPlan.stats.choiceStats.hintCount++;
+            updatedPlan.stats.hintCount = (updatedPlan.stats.hintCount || 0) + 1;
+            break;
+          case StudyChoice.Unknown:
+            updatedPlan.stats.choiceStats.unknownCount++;
+            updatedPlan.stats.repeatCount = (updatedPlan.stats.repeatCount || 0) + 1;
+            break;
+        }
+      }
     }
     
     updatedPlan.stats.studyTime += studyTime;
     
-    // 计算准确率
-    const totalAnswered = updatedPlan.stats.knownCount + updatedPlan.stats.unknownCount;
-    if (totalAnswered > 0) {
-      updatedPlan.stats.accuracy = (updatedPlan.stats.knownCount / totalAnswered) * 100;
+    // 计算准确率 - SM-2版本
+    if (updatedPlan.stats.choiceStats) {
+      const totalChoices = updatedPlan.stats.choiceStats.knowCount + 
+                          updatedPlan.stats.choiceStats.hintCount + 
+                          updatedPlan.stats.choiceStats.unknownCount;
+      if (totalChoices > 0) {
+        updatedPlan.stats.accuracy = 
+          ((updatedPlan.stats.choiceStats.knowCount + updatedPlan.stats.choiceStats.hintCount * 0.7) / totalChoices) * 100;
+      }
+    } else {
+      // 传统计算方式
+      const totalAnswered = updatedPlan.stats.knownCount + updatedPlan.stats.unknownCount;
+      if (totalAnswered > 0) {
+        updatedPlan.stats.accuracy = (updatedPlan.stats.knownCount / totalAnswered) * 100;
+      }
     }
     
     // 检查是否完成

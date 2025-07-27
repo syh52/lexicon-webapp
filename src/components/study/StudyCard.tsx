@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, ArrowRight, Check, X, Settings, User, ArrowLeft } from 'lucide-react';
-import { StudyCard as StudyCardType } from '../../types';
+import { Volume2, ArrowRight, Check, X, Settings, User, ArrowLeft, HelpCircle } from 'lucide-react';
+import { StudyCard as StudyCardType, StudyChoice } from '../../types';
 
 interface StudyCardProps {
   card: StudyCardType;
   showAnswer: boolean;
   onShowAnswer: () => void;
-  onRating: (isKnown: boolean) => void;
+  onChoice: (choice: StudyChoice) => void; // 支持三选项
   scheduler: any;
   current: number;
   total: number;
   onBack: () => void;
 }
 
-export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler, current, total, onBack }: StudyCardProps) {
+export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler, current, total, onBack }: StudyCardProps) {
   const [answerRevealed, setAnswerRevealed] = useState(false);
-  const [userChoice, setUserChoice] = useState<boolean | null>(null);
+  const [userChoice, setUserChoice] = useState<StudyChoice | null>(null);
+  const [showHint, setShowHint] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -23,6 +24,7 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler,
   useEffect(() => {
     setAnswerRevealed(false);
     setUserChoice(null);
+    setShowHint(false);
     setIsPlayingAudio(false);
     if (audioRef.current) {
       audioRef.current.pause();
@@ -73,7 +75,24 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler,
   };
 
   const handleKnow = () => {
-    setUserChoice(true);
+    setUserChoice(StudyChoice.Know);
+    setAnswerRevealed(true);
+    // 添加翻转卡片的逻辑
+    setTimeout(() => {
+      const flashcard = document.querySelector('.flashcard');
+      if (flashcard) {
+        flashcard.classList.add('flipped');
+      }
+    }, 100);
+  };
+
+  const handleHint = () => {
+    setShowHint(true);
+    // 显示提示但不立即翻转卡片
+  };
+
+  const handleKnowAfterHint = () => {
+    setUserChoice(StudyChoice.Hint);
     setAnswerRevealed(true);
     // 添加翻转卡片的逻辑
     setTimeout(() => {
@@ -85,7 +104,7 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler,
   };
 
   const handleDontKnow = () => {
-    setUserChoice(false);
+    setUserChoice(StudyChoice.Unknown);
     setAnswerRevealed(true);
     // 添加翻转卡片的逻辑
     setTimeout(() => {
@@ -105,7 +124,8 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler,
       }
       setAnswerRevealed(false);
       setUserChoice(null);
-      onRating(userChoice);
+      setShowHint(false);
+      onChoice(userChoice);
     }
   };
 
@@ -161,7 +181,7 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler,
               
               {/* Front Side */}
               <div className="flashcard-front absolute inset-0 flex bg-zinc-800/80 border-zinc-800 border rounded-3xl shadow-md backdrop-blur-sm items-center justify-center" style={{ backfaceVisibility: 'hidden' }}>
-                <div className="text-center p-8">
+                <div className="text-center p-8 w-full">
                   <h2 className="text-5xl font-medium text-white mb-4 tracking-tight">{card.word}</h2>
                   <div className="w-12 h-0.5 bg-indigo-500 mx-auto mb-4"></div>
                   <button 
@@ -176,6 +196,14 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler,
                   >
                     <Volume2 className="w-6 h-6 text-white" />
                   </button>
+                  
+                  {/* 提示内容 */}
+                  {showHint && card.meanings?.[0]?.example && (
+                    <div className="mt-6 bg-zinc-900/50 rounded-2xl p-4 border border-zinc-700">
+                      <p className="text-sm text-yellow-400 mb-2">💡 提示</p>
+                      <p className="text-sm text-zinc-300 italic">"{card.meanings[0].example}"</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -206,22 +234,57 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onRating, scheduler,
           </div>
 
           {/* Action Buttons */}
-          <div className={`flex flex-col space-y-4 w-full opacity-100 animate-fade-in ${answerRevealed ? 'hidden' : ''}`}>
-            <button 
-              onClick={handleKnow}
-              className="know-btn w-full hover:bg-indigo-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-indigo-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
-            >
-              <Check className="w-5 h-5" />
-              <span>I Know This</span>
-            </button>
-            
-            <button 
-              onClick={handleDontKnow}
-              className="dont-know-btn w-full hover:bg-zinc-700 transition-all duration-200 flex active:scale-95 font-medium text-white bg-zinc-800 border-zinc-800 border rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
-            >
-              <X className="w-5 h-5" />
-              <span>Don't Know</span>
-            </button>
+          <div className={`flex flex-col space-y-3 w-full opacity-100 animate-fade-in ${answerRevealed ? 'hidden' : ''}`}>
+            {!showHint ? (
+              <>
+                {/* 初始三选项 */}
+                <button 
+                  onClick={handleKnow}
+                  className="know-btn w-full hover:bg-green-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-green-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                >
+                  <Check className="w-5 h-5" />
+                  <span>认识</span>
+                </button>
+                
+                <button 
+                  onClick={handleHint}
+                  className="hint-btn w-full hover:bg-yellow-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-yellow-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                >
+                  <HelpCircle className="w-5 h-5" />
+                  <span>提示</span>
+                </button>
+                
+                <button 
+                  onClick={handleDontKnow}
+                  className="dont-know-btn w-full hover:bg-red-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-red-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                >
+                  <X className="w-5 h-5" />
+                  <span>不认识</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {/* 提示后的选项 */}
+                <div className="text-center text-sm text-yellow-400 mb-2">
+                  看完提示后，你现在认识这个单词吗？
+                </div>
+                <button 
+                  onClick={handleKnowAfterHint}
+                  className="know-after-hint-btn w-full hover:bg-yellow-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-yellow-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                >
+                  <Check className="w-5 h-5" />
+                  <span>现在认识了</span>
+                </button>
+                
+                <button 
+                  onClick={handleDontKnow}
+                  className="still-dont-know-btn w-full hover:bg-red-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-red-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                >
+                  <X className="w-5 h-5" />
+                  <span>仍然不认识</span>
+                </button>
+              </>
+            )}
           </div>
 
           {/* Next Button */}

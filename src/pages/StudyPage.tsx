@@ -5,15 +5,19 @@ import { StudyCard } from '../components/study/StudyCard';
 import { DailyStudyPlan } from '../services/DailyPlanGenerator';
 import dailyPlanService from '../services/dailyPlanService';
 import wordbookService, { Word, StudyRecord } from '../services/wordbookService';
-import { processUserChoice, SimpleWordRecord } from '../utils/simpleReviewAlgorithm';
+import { SM2Service, createStudySession } from '../services/sm2Service';
+import { DailyStudySession } from '../utils/sm2Algorithm';
+import { StudyChoice, SM2Card } from '../types';
 import { app, ensureLogin } from '../utils/cloudbase';
+import { studySessionService, StudySessionState } from '../services/studySessionService';
 
 interface StudySession {
   plan: DailyStudyPlan;
-  cards: any[];
+  sm2Session: DailyStudySession;
   currentCard: any;
   wordsMap: Map<string, any>;
   isCompleted: boolean;
+  sessionState?: StudySessionState; // 添加会话状态
 }
 
 export default function StudyPage() {
@@ -23,7 +27,8 @@ export default function StudyPage() {
   
   const [session, setSession] = useState<StudySession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [backgroundSaveQueue, setBackgroundSaveQueue] = useState<Array<{wordId: string, isKnown: boolean, timestamp: number}>>([]);
+  const [sm2Service] = useState(() => new SM2Service());
+  const [backgroundSaveQueue, setBackgroundSaveQueue] = useState<Array<{wordId: string, choice: StudyChoice, timestamp: number}>>([]);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
@@ -46,7 +51,11 @@ export default function StudyPage() {
       
       const startTime = Date.now();
       
-      // 获取或创建今日学习计划
+      // 🔄 优先尝试恢复学习进度
+      console.log('🔍 正在检查已保存的学习进度...');
+      const savedSessionState = await studySessionService.loadStudyProgress(user.uid, wordbookId);
+      
+      // 获取或创建今日学习计划（保持兼容性）
       const todayPlan = await dailyPlanService.getTodayStudyPlan(user.uid, wordbookId);
       
       if (!todayPlan) {
@@ -77,37 +86,83 @@ export default function StudyPage() {
       // 创建单词查找映射
       const wordsMap = new Map(words.map((word: any) => [word._id, word]));
       
-      // 构建学习卡片
-      const cards = todayPlan.plannedWords.map((wordId: string) => {
-        const originalWord = wordsMap.get(wordId);
-        
-        if (!originalWord) {
-          return null;
+      // 创建SM-2每日学习会话
+      let sm2Session = await createStudySession(user.uid, wordbookId, todayPlan.totalCount);
+      let sessionState: StudySessionState | undefined;
+      
+      // 🔄 如果有保存的进度，尝试恢复
+      if (savedSessionState && !savedSessionState.isCompleted) {
+        try {
+          console.log(`🔄 恢复学习进度: ${savedSessionState.completedCards}/${savedSessionState.totalCards}`);
+          
+          // 恢复学习会话到之前的状态
+          sm2Session = await studySessionService.restoreSession(savedSessionState, sm2Session);
+          sessionState = savedSessionState;
+          
+          setMessage({ 
+            type: 'success', 
+            text: `📚 已恢复学习进度 (${savedSessionState.completedCards}/${savedSessionState.totalCards})` 
+          });
+          
+          // 自动隐藏提示
+          setTimeout(() => setMessage(null), 3000);
+          
+        } catch (restoreError) {
+          console.error('恢复学习进度失败:', restoreError);
+          console.log('🆕 将创建新的学习会话');
+          // 清除无效的进度数据
+          try {
+            await studySessionService.clearAllProgress(user.uid, wordbookId);
+          } catch (clearError) {
+            console.warn('清除进度数据失败:', clearError);
+          }
+          // 重置会话状态以便创建新的
+          sessionState = undefined;
         }
-        
-        return {
-          _id: wordId,
-          word: originalWord.word,
-          meanings: [{
-            partOfSpeech: originalWord.pos || 'n.',
-            definition: originalWord.meaning || 'No definition available',
-            example: originalWord.example || `Example with ${originalWord.word}`
-          }],
-          pronunciation: originalWord.phonetic || originalWord.word,
-          originalWord: originalWord
-        };
-      }).filter(card => card !== null);
+      } else if (savedSessionState?.isCompleted) {
+        console.log('✅ 今日学习已完成，清除进度缓存');
+        try {
+          await studySessionService.clearAllProgress(user.uid, wordbookId);
+        } catch (clearError) {
+          console.warn('清除完成的进度缓存失败:', clearError);
+        }
+      }
+      
+      // 🆕 如果没有恢复成功，创建新的会话状态
+      if (!sessionState) {
+        sessionState = studySessionService.createSessionState(user.uid, wordbookId, sm2Session);
+        console.log('🆕 创建新的学习会话');
+      }
       
       // 获取当前要学习的卡片
-      const currentCard = todayPlan.currentIndex < cards.length ? cards[todayPlan.currentIndex] : null;
+      const currentSM2Card = sm2Session.getCurrentCard();
+      let currentCard = null;
+      
+      if (currentSM2Card) {
+        const originalWord = wordsMap.get(currentSM2Card.wordId);
+        if (originalWord) {
+          currentCard = {
+            _id: currentSM2Card.wordId,
+            word: originalWord.word,
+            meanings: [{
+              partOfSpeech: originalWord.pos || 'n.',
+              definition: originalWord.meaning || 'No definition available',
+              example: originalWord.example || `Example with ${originalWord.word}`
+            }],
+            pronunciation: originalWord.phonetic || originalWord.word,
+            originalWord: originalWord
+          };
+        }
+      }
       
       // 初始化学习会话
       const newSession: StudySession = {
         plan: todayPlan,
-        cards,
+        sm2Session,
         currentCard,
         wordsMap,
-        isCompleted: todayPlan.isCompleted || todayPlan.currentIndex >= cards.length
+        isCompleted: sm2Session.isCompleted(),
+        sessionState // 保存会话状态
       };
       
       const totalTime = Date.now() - startTime;
@@ -115,118 +170,150 @@ export default function StudyPage() {
       
       if (newSession.isCompleted) {
         setMessage({ type: 'success', text: '今日学习目标已完成！' });
+        // 清除已完成的进度缓存
+        await studySessionService.clearAllProgress(user.uid, wordbookId);
       }
+      
+      console.log('✅ 学习会话初始化成功');
       
     } catch (error) {
       console.error('初始化学习会话失败:', error);
-      setMessage({ type: 'error', text: '初始化学习会话失败' });
+      
+      // 只有在完全没有可用session时才显示错误
+      // 如果有部分功能可用，不显示错误消息
+      const hasPartialFunction = session?.currentCard || session?.sm2Session;
+      if (!hasPartialFunction) {
+        setMessage({ type: 'error', text: '初始化学习会话失败' });
+      } else {
+        console.log('⚠️ 初始化时有错误，但基本功能可用，继续执行');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRating = async (isKnown: boolean) => {
-    if (!session?.currentCard || !user) return;
+  const handleChoice = async (choice: StudyChoice) => {
+    if (!session?.currentCard || !user || !session.sm2Session || !session.sessionState) return;
     
     const currentCard = session.currentCard;
     const timestamp = Date.now();
     
-    // 1. 立即更新本地UI状态（乐观更新）
-    const updatedSession = {
-      ...session,
-      plan: {
-        ...session.plan,
-        completedWords: [...session.plan.completedWords, currentCard._id],
-        completedCount: session.plan.completedCount + 1,
-        currentIndex: Math.min(session.plan.currentIndex + 1, session.plan.totalCount - 1),
-        stats: {
-          ...session.plan.stats,
-          knownCount: isKnown ? session.plan.stats.knownCount + 1 : session.plan.stats.knownCount,
-          unknownCount: !isKnown ? session.plan.stats.unknownCount + 1 : session.plan.stats.unknownCount,
-        }
-      },
-      currentCard: session.plan.currentIndex + 1 < session.cards.length 
-        ? session.cards[session.plan.currentIndex + 1] 
-        : null,
-      isCompleted: session.plan.completedCount + 1 >= session.plan.totalCount
-    };
-    
-    // 立即更新UI
-    setSession(updatedSession);
-    
-    // 2. 将保存任务加入后台队列
-    const saveTask = {
-      wordId: currentCard._id,
-      isKnown,
-      timestamp
-    };
-    
-    setBackgroundSaveQueue(prev => [...prev, saveTask]);
-    
-    // 3. 异步执行保存（不阻塞UI）
-    backgroundSave(saveTask, currentCard);
-    
-    // 显示完成时的成功消息
-    if (updatedSession.isCompleted) {
-      setMessage({ 
-        type: 'success', 
-        text: `🎉 恭喜！今日学习目标已完成 (${updatedSession.plan.completedCount}/${updatedSession.plan.totalCount})` 
-      });
-    }
-    
-    };
-  
-  // 后台保存函数
-  const backgroundSave = async (saveTask: {wordId: string, isKnown: boolean, timestamp: number}, card: any) => {
+    // 1. 使用SM-2会话处理用户选择
     try {
-      // 获取学习记录并处理
-      const studyRecords = await wordbookService.getUserStudyRecords(user!.uid, wordbookId!);
-      const currentWordRecord = studyRecords.find(record => record.wordId === card._id);
+      const updatedSM2Card = session.sm2Session.processChoice(choice);
       
-      let updatedWordRecord;
-      if (currentWordRecord) {
-        const wordRecord = new SimpleWordRecord(card._id, card.word);
-        wordRecord.stage = currentWordRecord.stage || 0;
-        wordRecord.nextReview = new Date(currentWordRecord.nextReview || Date.now());
-        wordRecord.failures = currentWordRecord.failures || 0;
-        wordRecord.successes = currentWordRecord.successes || 0;
-        wordRecord.lastReview = currentWordRecord.lastReview ? new Date(currentWordRecord.lastReview) : null;
-        wordRecord.status = currentWordRecord.status || 'new';
-        wordRecord.createdAt = currentWordRecord.createdAt ? new Date(currentWordRecord.createdAt) : new Date();
-        updatedWordRecord = processUserChoice(wordRecord, saveTask.isKnown);
-      } else {
-        const wordRecord = new SimpleWordRecord(card._id, card.word);
-        updatedWordRecord = processUserChoice(wordRecord, saveTask.isKnown);
+      // 2. 更新会话状态（记录用户选择）
+      const updatedSessionState = studySessionService.updateSessionState(
+        session.sessionState,
+        currentCard._id,
+        choice
+      );
+      
+      // 3. 立即保存学习进度（双重保存策略）
+      await studySessionService.saveStudyProgress(updatedSessionState);
+      console.log(`💾 进度已保存: ${updatedSessionState.completedCards}/${updatedSessionState.totalCards}`);
+      
+      // 4. 获取下一张卡片
+      const nextSM2Card = session.sm2Session.getCurrentCard();
+      let nextCard = null;
+      
+      if (nextSM2Card) {
+        const originalWord = session.wordsMap.get(nextSM2Card.wordId);
+        if (originalWord) {
+          nextCard = {
+            _id: nextSM2Card.wordId,
+            word: originalWord.word,
+            meanings: [{
+              partOfSpeech: originalWord.pos || 'n.',
+              definition: originalWord.meaning || 'No definition available',
+              example: originalWord.example || `Example with ${originalWord.word}`
+            }],
+            pronunciation: originalWord.phonetic || originalWord.word,
+            originalWord: originalWord
+          };
+        }
       }
       
-      // 并行保存学习记录和更新进度
-      await Promise.all([
-        wordbookService.saveStudyRecord({
-          uid: user!.uid,
-          wordId: card._id,
-          wordbookId: wordbookId!,
-          stage: updatedWordRecord.stage,
-          nextReview: updatedWordRecord.nextReview,
-          failures: updatedWordRecord.failures,
-          successes: updatedWordRecord.successes,
-          lastReview: updatedWordRecord.lastReview,
-          status: updatedWordRecord.status,
-          createdAt: updatedWordRecord.createdAt
-        }),
-        dailyPlanService.updateStudyProgress(user!.uid, wordbookId!, {
-          wordId: card._id,
-          isKnown: saveTask.isKnown,
-          studyTime: Date.now() - saveTask.timestamp,
-          timestamp: new Date()
-        })
-      ]);
+      // 5. 更新会话状态
+      const sessionStats = session.sm2Session.getSessionStats();
+      const isCompleted = session.sm2Session.isCompleted();
+      
+      const updatedSession = {
+        ...session,
+        currentCard: nextCard,
+        isCompleted,
+        sessionState: updatedSessionState, // 更新会话状态
+        plan: {
+          ...session.plan,
+          completedCount: sessionStats.completed,
+          stats: {
+            ...session.plan.stats,
+            knownCount: sessionStats.choiceStats.know,
+            unknownCount: sessionStats.choiceStats.unknown,
+            hintCount: sessionStats.choiceStats.hint
+          }
+        }
+      };
+      
+      // 6. 立即更新UI
+      setSession(updatedSession);
+      
+      // 7. 将保存任务加入后台队列（SM2记录保存）
+      const saveTask = {
+        wordId: currentCard._id,
+        choice,
+        timestamp
+      };
+      
+      setBackgroundSaveQueue(prev => [...prev, saveTask]);
+      
+      // 8. 异步执行SM2记录保存（不阻塞UI）
+      backgroundSave(saveTask, updatedSM2Card);
+      
+      // 9. 如果学习完成，清除进度缓存
+      if (isCompleted) {
+        setMessage({ 
+          type: 'success', 
+          text: `🎉 恭喜！今日学习目标已完成 (${sessionStats.completed}/${sessionStats.total})` 
+        });
+        
+        // 异步清除已完成的进度缓存
+        setTimeout(async () => {
+          await studySessionService.clearAllProgress(user.uid, wordbookId!);
+          console.log('🗑️ 已清除完成的学习进度缓存');
+        }, 1000);
+      }
+      
+    } catch (error) {
+      console.error('处理用户选择失败:', error);
+      setMessage({ type: 'error', text: '处理选择失败，请重试' });
+    }
+  };
+  
+  // 后台保存函数
+  const backgroundSave = async (saveTask: {wordId: string, choice: StudyChoice, timestamp: number}, updatedSM2Card: SM2Card) => {
+    try {
+      // 使用SM-2服务保存学习记录
+      await sm2Service.saveSM2Record(updatedSM2Card, user!.uid, wordbookId!);
+      
+      // 更新学习进度（使用SM-2扩展）
+      await dailyPlanService.updateStudyProgress(user!.uid, wordbookId!, {
+        wordId: saveTask.wordId,
+        isKnown: saveTask.choice === StudyChoice.Know || saveTask.choice === StudyChoice.Hint,
+        studyTime: Date.now() - saveTask.timestamp,
+        timestamp: new Date(),
+        choice: saveTask.choice,
+        quality: saveTask.choice === StudyChoice.Know ? 5 : 
+                 saveTask.choice === StudyChoice.Hint ? 3 : 1,
+        isRepeat: false // 可以根据实际需求设置
+      });
       
       // 从队列中移除成功的任务
       setBackgroundSaveQueue(prev => prev.filter(task => 
         task.wordId !== saveTask.wordId || task.timestamp !== saveTask.timestamp
       ));
       
-      } catch (error) {
+    } catch (error) {
       console.error('后台保存失败:', error);
       // 静默失败，不影响用户体验
       // 可以在这里实现重试逻辑
@@ -241,10 +328,17 @@ export default function StudyPage() {
     
     try {
       setIsLoading(true);
+      
+      // 清除所有学习进度缓存
+      await studySessionService.clearAllProgress(user.uid, wordbookId);
+      console.log('🗑️ 已清除学习进度缓存');
+      
       // 重置今日学习计划
       await dailyPlanService.resetTodayPlan(user.uid, wordbookId);
+      
       // 重新初始化学习会话
       await initializeStudySession();
+      
     } catch (error) {
       console.error('重置学习会话失败:', error);
       setMessage({ type: 'error', text: '重置学习会话失败' });
@@ -263,7 +357,7 @@ export default function StudyPage() {
           <span className="text-xl text-white">准备学习材料...</span>
           <div className="text-sm text-gray-400 text-center">
             <p>正在加载今日学习计划</p>
-            <p>自动恢复学习进度</p>
+            <p>检查并恢复学习进度</p>
           </div>
         </div>
       </div>
@@ -295,15 +389,21 @@ export default function StudyPage() {
           <p>今日学习目标已达成</p>
           <div className="bg-gray-800 rounded-lg p-4 space-y-2">
             <p>
-              认识：<span className="text-green-400">{session.plan.stats.knownCount}</span> 个　　
-              不认识：<span className="text-red-400">{session.plan.stats.unknownCount}</span> 个
+              认识：<span className="text-green-400">{session.plan.stats.knownCount || 0}</span> 个　　
+              提示：<span className="text-yellow-400">{session.plan.stats.hintCount || 0}</span> 个　　
+              不认识：<span className="text-red-400">{session.plan.stats.unknownCount || 0}</span> 个
             </p>
             <p>
-              准确率：<span className="text-purple-400">{Math.round(session.plan.stats.accuracy)}%</span>
+              准确率：<span className="text-purple-400">{Math.round(session.plan.stats.accuracy || 0)}%</span>
             </p>
             <p className="text-sm text-gray-500">
-              新词：{session.plan.newWordsCount} 个，复习：{session.plan.reviewWordsCount} 个
+              共学习：{session.sm2Session?.getSessionStats().total || session.plan.totalCount} 个单词
             </p>
+            {session.sm2Session?.getSessionStats().choiceStats.unknown > 0 && (
+              <p className="text-sm text-yellow-400">
+                💡 {session.sm2Session.getSessionStats().choiceStats.unknown} 个困难单词将在稍后重复出现
+              </p>
+            )}
           </div>
         </div>
         <div className="flex space-x-4">
@@ -341,9 +441,9 @@ export default function StudyPage() {
           card={session.currentCard}
           showAnswer={false}
           onShowAnswer={() => {}}
-          onRating={handleRating}
-          current={session.plan.currentIndex}
-          total={session.plan.totalCount}
+          onChoice={handleChoice}
+          current={session.sm2Session?.getSessionStats().completed || 0}
+          total={session.sm2Session?.getSessionStats().total || session.plan.totalCount}
           onBack={handleBackToWordbooks}
           scheduler={null}
         />

@@ -1,0 +1,21 @@
+{
+  "name": "sm2-service",
+  "version": "1.0.0",
+  "description": "SM-2间隔重复算法云函数服务",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.4.0",
+    "@cloudbase/database": "^1.2.1"
+  },
+  "keywords": [
+    "cloudbase",
+    "sm2",
+    "spaced-repetition",
+    "vocabulary"
+  ],
+  "author": "Lexicon App",
+  "license": "MIT"
+}

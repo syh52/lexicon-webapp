@@ -12,7 +12,7 @@
 
 /* Modern smooth font rendering with Chinese support */
 body {
-  font-family: 'Noto Sans SC', 'Inter', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'SimHei', 'SimSun', sans-serif; 
+  font-family: 'Inter', 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'SimHei', 'SimSun', sans-serif; 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -107,6 +107,13 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Modern smooth font rendering for Inter */
+  body {
+    font-family: 'Inter', sans-serif; 
+    -webkit-font-smoothing: antialiased;
+   -moz-osx-font-smoothing: grayscale;
   }
   
   /* Chinese font support */

@@ -11,6 +11,9 @@ interface User extends UserType {
   lastStudyDate: string | null;
   isNewUser?: boolean;
   isAnonymous?: boolean;
+  // 权限系统相关字段
+  role?: 'user' | 'admin' | 'super_admin';
+  permissions?: string[];
 }
 
 interface AuthContextType {
@@ -22,6 +25,12 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateUserInfo: (userInfo: Partial<User>) => Promise<void>;
   isLoggedIn: boolean;
+  // 权限相关方法
+  hasPermission: (permission: string) => boolean;
+  hasRole: (role: 'user' | 'admin' | 'super_admin') => boolean;
+  promoteWithKey: (adminKey: string) => Promise<void>;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,7 +120,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           studiedWords: userInfo.studiedWords || 0,
           correctRate: userInfo.correctRate || 0,
           streakDays: userInfo.streakDays || 0,
-          lastStudyDate: userInfo.lastStudyDate || null
+          lastStudyDate: userInfo.lastStudyDate || null,
+          // 权限相关字段
+          role: userInfo.role || 'user',
+          permissions: userInfo.permissions || ['basic_learning']
         };
         
         setUser(userData);
@@ -168,7 +180,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           studiedWords: userInfo.studiedWords || 0,
           correctRate: userInfo.correctRate || 0,
           streakDays: userInfo.streakDays || 0,
-          lastStudyDate: userInfo.lastStudyDate || null
+          lastStudyDate: userInfo.lastStudyDate || null,
+          // 权限相关字段
+          role: userInfo.role || 'user',
+          permissions: userInfo.permissions || ['basic_learning']
         };
         
         setUser(userData);
@@ -235,7 +250,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           correctRate: 0,
           streakDays: 0,
           lastStudyDate: null,
-          isAnonymous: true
+          isAnonymous: true,
+          // 权限相关字段 - 匿名用户只有基础权限
+          role: 'user',
+          permissions: ['basic_learning']
         };
         
         setUser(userData);
@@ -300,7 +318,70 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // isLoggedIn 状态已经在上面定义为状态变量，不再依赖user对象
+  // 权限检查方法
+  const hasPermission = (permission: string): boolean => {
+    if (!user || !user.permissions) return false;
+    return user.permissions.includes(permission);
+  };
+
+  const hasRole = (role: 'user' | 'admin' | 'super_admin'): boolean => {
+    if (!user || !user.role) return false;
+    return user.role === role;
+  };
+
+  // 使用密钥提升权限
+  const promoteWithKey = async (adminKey: string) => {
+    if (!user) {
+      throw new Error('用户未登录');
+    }
+
+    setIsLoading(true);
+    try {
+      console.log('🔑 AuthContext: 开始权限提升...');
+      
+      // 确保CloudBase实例已初始化并登录
+      await ensureLogin();
+      const app = getApp();
+      
+      // 调用权限提升云函数
+      const result = await app.callFunction({
+        name: 'userInfo',
+        data: { 
+          action: 'promoteWithKey',
+          adminKey: adminKey
+        }
+      });
+      
+      if (result.result?.success) {
+        const promotionData = result.result.data;
+        
+        // 更新本地用户信息
+        const updatedUser: User = {
+          ...user,
+          role: promotionData.role,
+          permissions: promotionData.permissions
+        };
+        
+        setUser(updatedUser);
+        
+        // 更新本地存储
+        localStorage.setItem('lexicon_user', JSON.stringify(updatedUser));
+        
+        console.log('✅ AuthContext: 权限提升成功', promotionData);
+      } else {
+        throw new Error(result.result?.error || '权限提升失败');
+      }
+    } catch (error) {
+      console.error('❗ AuthContext: 权限提升失败:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 计算属性
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const value: AuthContextType = {
     user,
@@ -310,7 +391,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     anonymousLogin,
     logout,
     updateUserInfo,
-    isLoggedIn
+    isLoggedIn,
+    // 权限相关方法
+    hasPermission,
+    hasRole,
+    promoteWithKey,
+    isAdmin,
+    isSuperAdmin
   };
 
   return (

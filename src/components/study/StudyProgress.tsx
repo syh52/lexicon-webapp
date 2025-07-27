@@ -1,6 +1,6 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Progress } from '@/components/ui/Progress';
 import { BookOpen, RefreshCw, CheckCircle } from 'lucide-react';
 
 interface StudyProgressProps {

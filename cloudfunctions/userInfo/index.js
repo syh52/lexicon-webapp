@@ -9,7 +9,7 @@ const app = cloudbase.init({
 const db = app.database();
 
 exports.main = async (event, context) => {
-  const { action, userId, userInfo, displayName, email, password, type } = event;
+  const { action, userId, userInfo, displayName, email, password, type, adminKey, targetUserId, newRole } = event;
   const { userRecord } = context;
   
   // 获取当前用户ID - CloudBase v2 Web应用认证
@@ -46,6 +46,18 @@ exports.main = async (event, context) => {
       case 'login':
         // 用户登录验证
         return await loginUser(email, password);
+      
+      case 'promoteWithKey':
+        // 使用密钥提升用户权限
+        return await promoteUserWithKey(currentUserId, adminKey);
+      
+      case 'promoteUser':
+        // 管理员提升其他用户权限
+        return await promoteUserByAdmin(currentUserId, targetUserId, newRole);
+      
+      case 'listUsers':
+        // 获取用户列表（管理员功能）
+        return await listUsers(currentUserId);
         
       default:
         return {
@@ -83,6 +95,9 @@ async function getUserInfo(userId) {
           correctRate: 0,
           streakDays: 0,
           lastStudyDate: null,
+          // 权限相关字段
+          role: 'user',
+          permissions: ['basic_learning'],
           isNewUser: true
         }
       };
@@ -139,6 +154,12 @@ async function createUserInfo(userId, userInfo = {}) {
       correctRate: 0,
       streakDays: 0,
       lastStudyDate: null,
+      // 权限系统相关字段
+      role: 'user', // 默认为普通用户
+      permissions: ['basic_learning'], // 基础学习权限
+      adminKeyUsed: null,
+      promotedBy: null,
+      promotedAt: null,
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -192,6 +213,9 @@ async function getOrCreateUserInfo(userId, userInfo = {}) {
           correctRate: user.correctRate,
           streakDays: user.streakDays,
           lastStudyDate: user.lastStudyDate,
+          // 权限相关字段
+          role: user.role || 'user',
+          permissions: user.permissions || ['basic_learning'],
           isNewUser: false
         }
       };
@@ -393,7 +417,10 @@ async function loginUser(identifier, password) {
         studiedWords: user.studiedWords,
         correctRate: user.correctRate,
         streakDays: user.streakDays,
-        lastStudyDate: user.lastStudyDate
+        lastStudyDate: user.lastStudyDate,
+        // 权限相关字段
+        role: user.role || 'user',
+        permissions: user.permissions || ['basic_learning']
       }
     };
   } catch (error) {
@@ -506,7 +533,10 @@ async function registerUser(identifier, password, displayName, type = 'email') {
           studiedWords: userData.studiedWords,
           correctRate: userData.correctRate,
           streakDays: userData.streakDays,
-          lastStudyDate: userData.lastStudyDate
+          lastStudyDate: userData.lastStudyDate,
+          // 权限相关字段
+          role: userData.role,
+          permissions: userData.permissions
         }
       };
     } else {
@@ -521,6 +551,296 @@ async function registerUser(identifier, password, displayName, type = 'email') {
     return {
       success: false,
       error: '注册失败：' + error.message
+    };
+  }
+}
+
+// 使用密钥提升用户权限
+async function promoteUserWithKey(userId, adminKey) {
+  try {
+    if (!adminKey) {
+      return {
+        success: false,
+        error: '管理员密钥不能为空'
+      };
+    }
+
+    // 硬编码的超级管理员密钥（实际项目中应该从环境变量获取）
+    const SUPER_ADMIN_KEY = 'LEXICON_SUPER_ADMIN_2025';
+    
+    // 检查是否为超级管理员密钥
+    let targetRole = null;
+    let keyType = null;
+    
+    if (adminKey === SUPER_ADMIN_KEY) {
+      targetRole = 'super_admin';
+      keyType = 'super_admin_key';
+    } else {
+      // 检查是否为管理员密钥（从数据库查询）
+      const keyResult = await db.collection('admin_keys')
+        .where({ 
+          keyHash: await bcrypt.hash(adminKey, 10),
+          isActive: true 
+        })
+        .get();
+        
+      if (keyResult.data.length > 0) {
+        const keyDoc = keyResult.data[0];
+        targetRole = keyDoc.type === 'admin' ? 'admin' : null;
+        keyType = 'admin_key';
+        
+        // 更新密钥使用记录
+        await db.collection('admin_keys')
+          .doc(keyDoc._id)
+          .update({
+            data: {
+              usedCount: keyDoc.usedCount + 1,
+              lastUsedAt: new Date()
+            }
+          });
+      }
+    }
+    
+    if (!targetRole) {
+      return {
+        success: false,
+        error: '无效的管理员密钥'
+      };
+    }
+
+    // 获取用户信息
+    const userResult = await db.collection('users')
+      .where({ uid: userId })
+      .get();
+
+    if (userResult.data.length === 0) {
+      return {
+        success: false,
+        error: '用户不存在'
+      };
+    }
+
+    const user = userResult.data[0];
+    
+    // 设置权限
+    let permissions = [];
+    if (targetRole === 'super_admin') {
+      permissions = ['basic_learning', 'batch_upload', 'user_management', 'admin_key_generation', 'system_settings'];
+    } else if (targetRole === 'admin') {
+      permissions = ['basic_learning', 'batch_upload', 'user_view'];
+    }
+
+    // 更新用户权限
+    const updateResult = await db.collection('users')
+      .doc(user._id)
+      .update({
+        data: {
+          role: targetRole,
+          permissions: permissions,
+          adminKeyUsed: keyType,
+          promotedBy: targetRole === 'super_admin' ? 'system' : 'admin_key',
+          promotedAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+
+    if (updateResult.stats.updated > 0) {
+      // 记录操作日志
+      await db.collection('admin_logs').add({
+        data: {
+          userId: userId,
+          action: 'role_promotion',
+          oldRole: user.role || 'user',
+          newRole: targetRole,
+          keyType: keyType,
+          timestamp: new Date()
+        }
+      });
+      
+      return {
+        success: true,
+        data: {
+          message: `成功提升为${targetRole === 'super_admin' ? '超级管理员' : '管理员'}`,
+          role: targetRole,
+          permissions: permissions
+        }
+      };
+    } else {
+      return {
+        success: false,
+        error: '权限提升失败'
+      };
+    }
+  } catch (error) {
+    console.error('权限提升失败:', error);
+    return {
+      success: false,
+      error: '权限提升失败：' + error.message
+    };
+  }
+}
+
+// 管理员提升其他用户权限
+async function promoteUserByAdmin(adminUserId, targetUserId, newRole) {
+  try {
+    // 检查操作者权限
+    const adminResult = await db.collection('users')
+      .where({ uid: adminUserId })
+      .get();
+
+    if (adminResult.data.length === 0) {
+      return {
+        success: false,
+        error: '操作者不存在'
+      };
+    }
+
+    const admin = adminResult.data[0];
+    if (admin.role !== 'super_admin') {
+      return {
+        success: false,
+        error: '只有超级管理员可以提升其他用户权限'
+      };
+    }
+
+    // 检查目标用户
+    const targetResult = await db.collection('users')
+      .where({ uid: targetUserId })
+      .get();
+
+    if (targetResult.data.length === 0) {
+      return {
+        success: false,
+        error: '目标用户不存在'
+      };
+    }
+
+    const targetUser = targetResult.data[0];
+    
+    // 设置权限
+    let permissions = [];
+    if (newRole === 'admin') {
+      permissions = ['basic_learning', 'batch_upload', 'user_view'];
+    } else if (newRole === 'user') {
+      permissions = ['basic_learning'];
+    } else {
+      return {
+        success: false,
+        error: '无效的角色类型'
+      };
+    }
+
+    // 更新目标用户权限
+    const updateResult = await db.collection('users')
+      .doc(targetUser._id)
+      .update({
+        data: {
+          role: newRole,
+          permissions: permissions,
+          promotedBy: adminUserId,
+          promotedAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+
+    if (updateResult.stats.updated > 0) {
+      // 记录操作日志
+      await db.collection('admin_logs').add({
+        data: {
+          adminId: adminUserId,
+          targetUserId: targetUserId,
+          action: 'role_change',
+          oldRole: targetUser.role || 'user',
+          newRole: newRole,
+          timestamp: new Date()
+        }
+      });
+      
+      return {
+        success: true,
+        data: {
+          message: `成功将用户权限修改为${newRole === 'admin' ? '管理员' : '普通用户'}`,
+          targetUser: {
+            uid: targetUser.uid,
+            displayName: targetUser.displayName,
+            role: newRole,
+            permissions: permissions
+          }
+        }
+      };
+    } else {
+      return {
+        success: false,
+        error: '权限修改失败'
+      };
+    }
+  } catch (error) {
+    console.error('权限修改失败:', error);
+    return {
+      success: false,
+      error: '权限修改失败：' + error.message
+    };
+  }
+}
+
+// 获取用户列表（管理员功能）
+async function listUsers(adminUserId) {
+  try {
+    // 检查操作者权限
+    const adminResult = await db.collection('users')
+      .where({ uid: adminUserId })
+      .get();
+
+    if (adminResult.data.length === 0) {
+      return {
+        success: false,
+        error: '操作者不存在'
+      };
+    }
+
+    const admin = adminResult.data[0];
+    if (!admin.role || !['admin', 'super_admin'].includes(admin.role)) {
+      return {
+        success: false,
+        error: '权限不足，需要管理员权限'
+      };
+    }
+
+    // 获取用户列表
+    const usersResult = await db.collection('users')
+      .orderBy('createdAt', 'desc')
+      .limit(100)
+      .get();
+
+    const users = usersResult.data.map(user => ({
+      uid: user.uid,
+      displayName: user.displayName,
+      email: user.email || '',
+      username: user.username || '',
+      avatar: user.avatar,
+      role: user.role || 'user',
+      permissions: user.permissions || ['basic_learning'],
+      level: user.level,
+      totalWords: user.totalWords,
+      studiedWords: user.studiedWords,
+      createdAt: user.createdAt,
+      lastStudyDate: user.lastStudyDate,
+      promotedBy: user.promotedBy,
+      promotedAt: user.promotedAt
+    }));
+
+    return {
+      success: true,
+      data: {
+        users: users,
+        total: users.length
+      }
+    };
+  } catch (error) {
+    console.error('获取用户列表失败:', error);
+    return {
+      success: false,
+      error: '获取用户列表失败：' + error.message
     };
   }
 }

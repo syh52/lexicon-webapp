@@ -2,25 +2,30 @@ import React, { HTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'outlined' | 'elevated' | 'glass';
-  padding?: 'none' | 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'outlined' | 'elevated' | 'glass' | 'glass-strong';
+  padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
   hover?: boolean;
+  perspective?: boolean; // 是否启用3D透视效果
+  enhanced?: boolean; // 是否启用增强交互效果
 }
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
   (
     {
       className,
-      variant = 'default',
+      variant = 'glass',
       padding = 'md',
       hover = false,
+      perspective = false,
+      enhanced = false,
       children,
       ...props
     },
     ref
   ) => {
     const baseClasses = [
-      'rounded-xl transition-all duration-200'
+      'rounded-2xl transition-all duration-200',
+      'relative z-10'
     ];
 
     const variants = {
@@ -34,21 +39,33 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
         'bg-gray-800 shadow-lg shadow-gray-900/20'
       ],
       glass: [
-        'bg-white/5 backdrop-blur-sm border border-white/10'
+        'glass-card'
+      ],
+      'glass-strong': [
+        'glass-card-strong'
       ]
     };
 
     const paddings = {
       none: '',
       sm: 'p-3',
-      md: 'p-4',
-      lg: 'p-6'
+      md: 'p-4 sm:p-6',
+      lg: 'p-6 sm:p-8',
+      xl: 'p-8 sm:p-10 md:p-12'
     };
 
     const hoverClasses = hover ? [
-      'hover:scale-[1.02]',
-      'hover:shadow-lg hover:shadow-gray-900/30',
+      'hover:scale-105',
+      'hover:bg-white/[0.12]',
       'cursor-pointer'
+    ] : [];
+
+    const perspectiveClasses = perspective ? [
+      'perspective-element'
+    ] : [];
+
+    const enhancedClasses = enhanced ? [
+      'btn-enhanced'
     ] : [];
 
     const classes = cn(
@@ -56,6 +73,8 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       variants[variant],
       paddings[padding],
       hoverClasses,
+      perspectiveClasses,
+      enhancedClasses,
       className
     );
 
@@ -121,4 +140,5 @@ export const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
 );
 CardFooter.displayName = 'CardFooter';
 
+export { Card };
 export default Card;

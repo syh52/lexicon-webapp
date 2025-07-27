@@ -354,6 +354,15 @@ export const lazyRoutes = {
     'TestPage'
   ),
 
+  AdminPage: createLazyComponent(
+    () => import('../pages/AdminPage'),
+    { 
+      fallback: () => <PageLoader text="加载管理面板" />,
+      delay: 150
+    },
+    'AdminPage'
+  ),
+
 };
 
 /**

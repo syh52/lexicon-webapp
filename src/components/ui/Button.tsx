@@ -2,12 +2,13 @@ import React, { ButtonHTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'glass';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   fullWidth?: boolean;
+  enhanced?: boolean; // 是否启用波纹效果
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -20,6 +21,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       leftIcon,
       rightIcon,
       fullWidth = false,
+      enhanced = false,
       disabled,
       children,
       ...props
@@ -28,42 +30,44 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const baseClasses = [
       'inline-flex items-center justify-center gap-2',
-      'font-medium rounded-lg transition-all duration-200',
-      'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900',
+      'font-medium rounded-2xl transition-all duration-200',
+      'modern-focus',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      'active:scale-[0.98]'
+      'hover:scale-105 active:scale-95',
+      'relative z-10'
     ];
 
     const variants = {
       primary: [
-        'bg-purple-600 text-white hover:bg-purple-700',
-        'focus:ring-purple-500',
-        'disabled:bg-purple-800'
+        'gradient-primary text-white shadow-lg',
+        'hover:shadow-glow'
       ],
       secondary: [
-        'bg-gray-800 text-gray-300 hover:bg-gray-700',
-        'border border-gray-700 hover:border-gray-600',
-        'focus:ring-gray-500'
+        'glass-card text-gray-300 hover:bg-white/20',
+        'border border-white/20 hover:border-white/30'
       ],
       ghost: [
-        'text-gray-400 hover:text-white hover:bg-gray-800/50',
-        'focus:ring-gray-500'
+        'text-gray-400 hover:text-white hover:bg-white/10',
+        'backdrop-blur-sm'
       ],
       danger: [
-        'bg-red-600 text-white hover:bg-red-700',
-        'focus:ring-red-500',
-        'disabled:bg-red-800'
+        'bg-red-600 text-white hover:bg-red-700 shadow-lg',
+        'hover:shadow-red-500/30'
       ],
       outline: [
         'border border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white',
-        'focus:ring-purple-500'
+        'backdrop-blur-sm hover:shadow-glow'
+      ],
+      glass: [
+        'glass-card-strong text-white border border-white/20',
+        'hover:bg-white/20 hover:border-white/30 shadow-lg'
       ]
     };
 
     const sizes = {
-      sm: 'px-3 py-2 text-sm h-8',
-      md: 'px-4 py-2.5 text-sm h-10',
-      lg: 'px-6 py-3 text-base h-12'
+      sm: 'px-4 py-2 text-sm h-9',
+      md: 'px-6 py-3 text-sm h-11',
+      lg: 'px-8 py-3.5 text-base h-12'
     };
 
     const classes = cn(
@@ -73,6 +77,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       {
         'w-full': fullWidth,
         'cursor-not-allowed': loading || disabled,
+        'btn-enhanced': enhanced,
       },
       className
     );
@@ -103,4 +108,5 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
 Button.displayName = 'Button';
 
+export { Button };
 export default Button;

@@ -1,6 +1,6 @@
 /**
  * 学习追踪云函数
- * 管理学习进度、复习安排和FSRS算法
+ * 管理学习进度、复习安排和SM2算法
  */
 const cloudbase = require('@cloudbase/node-sdk');
 
@@ -142,8 +142,8 @@ async function updatePerformance(data) {
     if (existing.data && existing.data.length > 0) {
       const record = existing.data[0];
       
-      // 简化的FSRS算法更新
-      const newInterval = calculateNextInterval(
+      // 使用SM2算法更新间隔
+      const newInterval = calculateSM2Interval(
         record.difficulty || 3,
         performance,
         record.reviewCount || 1
@@ -231,24 +231,34 @@ async function getLearningStats(data = {}) {
 }
 
 /**
- * 计算下次复习间隔（简化的FSRS算法）
+ * 计算下次复习间隔（基于SM2算法）
  */
-function calculateNextInterval(difficulty, performance, reviewCount) {
-  // 基础间隔（天）
-  const baseIntervals = [1, 3, 7, 14, 30];
+function calculateSM2Interval(difficulty, performance, reviewCount) {
+  // SM2算法的简化实现
+  let EF = 2.5; // 初始易记因子
   
-  // 根据表现调整
-  const performanceMultiplier = Math.max(0.5, Math.min(2.0, performance / 2));
+  // 根据历史表现调整EF
+  if (reviewCount > 1) {
+    // 假设performance是0-4的评分，转换为质量评分
+    const quality = Math.max(0, Math.min(5, Math.round(performance)));
+    EF = EF + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    EF = Math.max(1.3, EF);
+  }
   
-  // 根据难度调整
-  const difficultyMultiplier = Math.max(0.8, Math.min(1.2, (6 - difficulty) / 5));
+  let interval;
+  if (reviewCount === 1) {
+    interval = 1;
+  } else if (reviewCount === 2) {
+    interval = 6;
+  } else {
+    // 对于后续复习，interval = 上次间隔 × EF
+    const previousInterval = Math.max(1, Math.round(6 * Math.pow(EF, reviewCount - 2)));
+    interval = Math.round(previousInterval * EF);
+  }
   
-  // 获取基础间隔
-  const baseIndex = Math.min(reviewCount - 1, baseIntervals.length - 1);
-  const baseInterval = baseIntervals[baseIndex];
+  // 根据难度微调
+  const difficultyAdjustment = Math.max(0.7, Math.min(1.3, (6 - difficulty) / 5));
+  interval = Math.round(interval * difficultyAdjustment);
   
-  // 计算最终间隔
-  const finalInterval = Math.round(baseInterval * performanceMultiplier * difficultyMultiplier);
-  
-  return Math.max(1, finalInterval); // 至少1天
+  return Math.max(1, Math.min(365, interval)); // 间隔在1-365天之间
 }

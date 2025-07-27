@@ -166,4 +166,5 @@ export const BadgeContainer = forwardRef<HTMLDivElement, {
 
 BadgeContainer.displayName = 'BadgeContainer';
 
+export { Badge };
 export default Badge;

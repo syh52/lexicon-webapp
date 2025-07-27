@@ -1,10 +1,10 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { User, ChevronLeft } from 'lucide-react';
+import { User, ChevronLeft, Settings } from 'lucide-react';
 
 export default function MobileHeader() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, isAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const pathname = location.pathname;
@@ -44,25 +44,39 @@ export default function MobileHeader() {
             </button>
           )}
         </div>
-        <div 
-          className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center cursor-pointer hover:bg-gray-700 transition-all duration-200 active:scale-95"
-          onClick={() => {
-            if (isLoggedIn) {
-              navigate('/profile');
-            } else {
-              navigate('/login');
-            }
-          }}
-        >
-          {isLoggedIn && user?.avatar ? (
-            <img 
-              src={user.avatar} 
-              alt="用户头像" 
-              className="w-8 h-8 rounded-full object-cover"
-            />
-          ) : (
-            <User className="h-5 w-5 text-gray-300" />
+        <div className="flex items-center space-x-3">
+          {/* 管理员按钮 */}
+          {isLoggedIn && isAdmin && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center cursor-pointer hover:bg-purple-600/30 transition-all duration-200 active:scale-95"
+              title="管理面板"
+            >
+              <Settings className="h-4 w-4 text-purple-400" />
+            </button>
           )}
+          
+          {/* 用户头像 */}
+          <div 
+            className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center cursor-pointer hover:bg-gray-700 transition-all duration-200 active:scale-95"
+            onClick={() => {
+              if (isLoggedIn) {
+                navigate('/profile');
+              } else {
+                navigate('/login');
+              }
+            }}
+          >
+            {isLoggedIn && user?.avatar ? (
+              <img 
+                src={user.avatar} 
+                alt="用户头像" 
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            ) : (
+              <User className="h-5 w-5 text-gray-300" />
+            )}
+          </div>
         </div>
       </div>
     </div>

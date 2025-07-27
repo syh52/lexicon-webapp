@@ -1,463 +1,409 @@
-# Lexicon 英语学习平台
-
-一个现代化的英语学习Web应用，专为吉祥航空安全员定制，提供优质的英语学习体验。
+# Lexicon 智能英语学习平台
 
 [![Powered by CloudBase](https://7463-tcb-advanced-a656fc-1257967285.tcb.qcloud.la/mcp/powered-by-cloudbase-badge.svg)](https://github.com/TencentCloudBase/CloudBase-AI-ToolKit)
 
+一个基于云开发的现代化英语学习Web应用，采用SM2间隔重复算法、AI语音助手、实时对话和智能学习管理，为用户提供科学高效的英语学习体验。
+
 ## 🚀 在线体验
 
-**[https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com](https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com)**
+**生产环境**: [https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com](https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com)
 
-> 📅 最后部署: 2025-07-24  
+> 📅 最后部署: 2025-07-25  
 > ✅ 状态: 正常运行  
-> 🔧 版本: v1.0.0
+> 🔧 版本: v2.0.0  
+> 🎯 环境: cloud1-7g7oatv381500c81
 
-## ✨ 项目特色
+## ✨ 核心功能
 
-**Lexicon** 为吉祥航空安全员提供专业的英语学习解决方案，支持碎片化学习和个性化复习。
+### 🎓 智能学习系统
+- ✅ **SM2算法背单词** - 基于科学的SuperMemo 2间隔重复算法，三档评分(知道/提示/不知道)
+- ✅ **个性化学习计划** - 根据记忆曲线动态调整复习间隔和难度
+- ✅ **多维度进度追踪** - 详细的学习统计、掌握程度和复习建议
+- ✅ **词书管理系统** - 支持自定义词书上传(CSV/JSON格式)和管理
 
-### 核心功能
+### 🤖 AI语音助手
+- ✅ **实时语音对话** - 基于OpenAI Realtime API的流畅对话体验
+- ✅ **智能语音识别** - 高精度的语音转文本功能(OpenAI Whisper)
+- ✅ **多场景对话练习** - 情景对话、发音练习、词汇学习
+- ✅ **语音合成播放** - 自然流畅的AI语音播放(OpenAI TTS)
 
-- ✅ **完善的认证系统** - 邮箱注册/登录 + 匿名快速体验
-- ✅ **FSRS背单词功能** - 基于科学间隔重复算法的真实背单词体验
-- ✅ **每日学习目标** - 自定义每天背单词数量，类似扇贝单词体验
-- ✅ **自动进度保存** - 学习进度实时保存，关闭页面可恢复
-- ✅ **智能学习计划** - 根据用户设置生成个性化每日学习计划
-- ✅ **智能卡片调度** - 4档评分系统，自适应学习间隔
-- ✅ **3D翻转卡片** - 沉浸式学习界面，优秀的视觉体验
-- ✅ **个性化参数优化** - 根据学习历史动态调整FSRS参数
-- ✅ **学习统计分析** - 详细的进度跟踪和学习建议
-- ✅ **现代UI设计** - Glass Morphism风格，流畅的交互动画
+### 🔐 用户管理
+- ✅ **完善认证系统** - 支持邮箱注册/登录 + 匿名快速体验
+- ✅ **管理员系统** - 用户管理、密钥生成、数据统计
+- ✅ **个人资料管理** - 学习偏好设置和数据同步
+
+### 📱 现代化界面
+- ✅ **Glass Morphism设计** - 现代毛玻璃美学风格
+- ✅ **响应式设计** - 完美适配桌面和移动设备
+- ✅ **流畅动画效果** - 自然的交互反馈和页面过渡(Framer Motion)
+- ✅ **深色主题** - 护眼的深色配色方案
 
 ## 🛠 技术架构
 
 ### 前端技术栈
-- **React 18** + **TypeScript** - 现代化前端开发
-- **Vite** - 极速构建工具
-- **React Router 6** - 单页应用路由管理  
-- **Tailwind CSS** + **DaisyUI** - 原子化CSS框架
-- **Framer Motion** - 流畅动画效果
+```
+React 18 + TypeScript     现代化组件开发
+Vite 6.3.5                极速构建工具  
+React Router 6            单页应用路由管理
+Tailwind CSS + DaisyUI    原子化CSS框架
+Framer Motion             流畅动画效果
+Lucide React              现代图标库
+```
 
-### 云开发资源
-- **CloudBase 认证** - 用户身份管理
-- **云数据库** - 用户数据、学习记录和FSRS参数存储
-  - `user_settings` - 用户学习偏好设置
-  - `daily_study_plans` - 每日学习计划和进度
-  - `study_sessions` - 学习会话详细信息
-- **云函数** - FSRS算法处理和业务逻辑
-  - `user-settings` - 用户设置管理
-  - `daily-plan` - 每日计划管理
-- **静态网站托管** - 前端应用部署
+### 云开发资源架构
+```
+📦 云数据库集合
+├── users                 用户基础信息
+├── user_settings         用户学习偏好配置
+├── daily_study_plans     每日学习计划数据
+├── study_records         学习记录和SM2参数
+├── wordbooks            词书管理数据
+├── words                单词数据
+└── admin_keys           管理员密钥管理
 
-### FSRS核心技术
-- **间隔重复算法** - 基于fsrs4anki项目的成熟算法
-- **记忆科学** - 遗忘曲线和最优复习间隔
-- **个性化学习** - 根据用户表现调整参数
-- **智能调度** - 自适应卡片优先级管理
+🔧 云函数服务 (15个)
+├── ai-chat              AI对话服务(GPT-4o-mini)
+├── speech-recognition   语音识别服务(OpenAI Whisper)
+├── text-to-speech       语音合成服务(OpenAI TTS)
+├── realtime-proxy       实时语音代理(OpenAI Realtime API)
+├── voice-assistant      语音助手服务
+├── dictionary-lookup    词典查询服务
+├── learning-tracker     学习进度追踪
+├── sm2-service          SM2算法服务
+├── daily-plan          每日计划管理
+├── user-settings       用户设置管理
+├── userInfo            用户信息服务
+├── getWordbooks        词书列表获取
+├── getWordsByWordbook  词书内容获取
+├── upload-wordbook     词书上传服务
+└── admin-management    管理员功能
 
-## 📚 文档中心
+🌐 静态网站托管
+└── dist/               生产构建产物部署
+```
 
-详细的项目文档已整理至 [`docs/`](./docs/) 目录：
+### 核心算法与AI集成
+- **SM2算法** - SuperMemo 2间隔重复算法，支持三档评分系统(知道/提示/不知道)
+- **OpenAI GPT-4o-mini** - 智能对话和内容生成
+- **OpenAI Whisper** - 高精度语音识别
+- **OpenAI TTS** - 自然语音合成
+- **OpenAI Realtime API** - 实时语音对话
 
-- **[架构设计](./docs/architecture/)** - 数据库设计、UI设计规范
-- **[开发文档](./docs/development/)** - 组件开发、调试经验
-- **[分析报告](./docs/analysis/)** - 性能分析、功能分析
-- **[方案规划](./docs/planning/)** - 语音对话AI集成方案
-- **[组件文档](./docs/components/)** - 可复用组件使用指南
+## 📁 项目结构
 
-## 开始使用
+```
+lexicon-webapp/
+├── 📱 前端应用 (src/)
+│   ├── pages/                   页面组件
+│   │   ├── HomePage.tsx          首页
+│   │   ├── StudyPage.tsx         学习页面
+│   │   ├── WordbooksPage.tsx     词书管理
+│   │   ├── VoiceAssistantPage.jsx 语音助手
+│   │   ├── ProfilePage.tsx       用户资料
+│   │   ├── StatsPage.tsx         学习统计
+│   │   ├── AdminPage.tsx         管理员页面
+│   │   └── AuthPage.tsx          认证页面
+│   │
+│   ├── components/               可复用组件
+│   │   ├── study/               学习相关组件
+│   │   ├── voice/               语音相关组件
+│   │   ├── upload/              上传相关组件
+│   │   ├── admin/               管理员组件
+│   │   ├── auth/                认证组件
+│   │   └── ui/                  基础UI组件
+│   │
+│   ├── services/                业务逻辑服务
+│   │   ├── sm2Service.ts         SM2算法服务
+│   │   ├── DailyPlanGenerator.ts  学习计划生成
+│   │   ├── wordbookService.ts    词书管理服务
+│   │   ├── userSettingsService.ts 用户设置服务
+│   │   └── ...                  其他服务
+│   │
+│   ├── utils/                   工具函数
+│   │   ├── cloudbase.ts         云开发初始化
+│   │   ├── sm2Algorithm.ts      SM2算法实现
+│   │   └── ...                  其他工具
+│   │
+│   ├── contexts/                React上下文
+│   │   └── AuthContext.tsx      认证状态管理
+│   │
+│   ├── hooks/                   自定义Hook
+│   │   ├── useRealtimeSession.js     实时会话Hook
+│   │   └── useRealtimeSessionHTTP.js HTTP会话Hook
+│   │
+│   ├── types/                   TypeScript类型定义
+│   └── assets/                  静态资源
 
-### 前提条件
+├── ☁️ 云函数 (cloudfunctions/)
+│   ├── ai-chat/                 AI对话服务
+│   ├── speech-recognition/      语音识别
+│   ├── text-to-speech/         语音合成
+│   ├── realtime-proxy/         实时语音代理
+│   ├── voice-assistant/        语音助手
+│   ├── sm2-service/            SM2算法服务
+│   ├── learning-tracker/       学习追踪
+│   ├── daily-plan/             学习计划管理
+│   ├── dictionary-lookup/      词典查询
+│   ├── user-settings/          用户设置
+│   ├── admin-management/       管理员功能
+│   ├── userInfo/               用户信息
+│   ├── getWordbooks/           词书列表
+│   ├── getWordsByWordbook/     词书内容
+│   └── upload-wordbook/        词书上传
 
-- 安装 Node.js (版本 14 或更高)
-- 腾讯云开发账号 (可在[腾讯云开发官网](https://tcb.cloud.tencent.com/)注册)
+├── 📚 文档 (docs/)
+│   ├── testing-guide.md        测试指南
+│   ├── voice-assistant-plan1-simple.md   语音助手方案1
+│   └── voice-assistant-plan2-custom.md   语音助手方案2
 
-### 安装依赖
+├── 🔧 脚本工具 (scripts/)
+│   └── deploy-check.js         部署检查脚本
 
+├── 🌍 静态资源 (public/)
+│   ├── audioProcessor.js       音频处理器
+│   ├── fonts/                  字体文件
+│   └── test.html              测试页面
+
+├── 📖 项目文档
+│   ├── README.md               项目说明文档 (本文件)
+│   ├── UI_DESIGN_GUIDE.md      UI设计指南
+│   ├── VOICE_RECOGNITION_FIX.md  语音识别修复指南
+│   ├── CloudBase-MCP部署规范.md   部署规范
+│   ├── 部署最佳实践指南.md        部署指南
+│   └── 云函数配置说明.md         云函数配置
+│
+└── 🛠 配置文件
+    ├── package.json            项目依赖配置
+    ├── cloudbaserc.json        云开发配置
+    ├── vite.config.js          构建配置
+    ├── tailwind.config.js      样式配置
+    ├── tsconfig.json           TypeScript配置
+    └── deploy.sh               部署脚本
+```
+
+## 🚀 快速开始
+
+### 环境要求
+- Node.js 18+
+- npm 或 yarn
+- 云开发环境(已配置为 cloud1-7g7oatv381500c81)
+
+### 1. 克隆项目
+```bash
+git clone <repository-url>
+cd lexicon-webapp
+```
+
+### 2. 安装依赖
 ```bash
 npm install
 ```
 
-### 配置云开发环境
-
-1. 打开 `src/utils/cloudbase.js` 文件
-2. 将 `ENV_ID` 变量的值修改为您的云开发环境 ID
-3. 将 `vite.config.js` 中的`https://envId-appid.tcloudbaseapp.com/` 替换为你的云开发环境静态托管默认域名，可以使用 MCP 来查询云开发环境静态托管默认域名
-
-### 本地开发
-
+### 3. 环境配置
 ```bash
+# 配置云开发环境ID (在cloudbaserc.json中)
+# 配置AI API密钥 (在云函数环境变量中)
+./configure-ai-api.sh
+```
+
+### 4. 本地开发
+```bash
+# 启动开发服务器
 npm run dev
-```
 
-### 构建生产版本
-
-```bash
+# 构建生产版本
 npm run build
+
+# 预览构建结果
+npm run preview
 ```
 
-### 初始化FSRS数据库和示例数据
-
+### 5. 部署到云开发
 ```bash
-# 初始化数据库结构
-node scripts/init-fsrs-database.js
+# 快速部署 (推荐)
+./deploy.sh
 
-# 导入示例单词数据
-node scripts/import-sample-words.js
+# 或手动部署
+npm run build
+npx @cloudbase/cli hosting deploy dist -e cloud1-7g7oatv381500c81
 ```
+
+## 📚 使用指南
+
+### 智能背单词功能
+1. **选择词书** - 在词书页面选择学习材料
+2. **SM2算法** - 基于SuperMemo 2科学记忆算法
+3. **设置目标** - 配置每日学习和复习数量
+4. **开始学习** - 3D翻转卡片展示单词
+5. **三档评分** - SM2算法的三档评分系统(知道/提示/不知道)
+6. **智能调度** - 算法自动安排最佳复习时间
+
+### AI语音助手功能
+1. **进入语音助手** - 点击语音助手页面
+2. **选择模式** - 对话练习/发音训练/词汇学习
+3. **开始对话** - 点击录音按钮开始语音交互
+4. **实时反馈** - 获得即时的语音识别和AI回复
+
+### 词书管理功能
+1. **上传词书** - 支持CSV/JSON格式词书文件
+2. **管理词书** - 查看、编辑、删除词书
+3. **学习统计** - 查看词书学习进度和统计
+
+## 🎯 核心特性详解
+
+### SM2间隔重复算法
+#### SuperMemo 2算法特性
+- **科学依据** - 基于SuperMemo 2的成熟记忆算法
+- **三档评分** - 知道/提示/不知道简化评分体系
+- **易记因子(EF)** - 动态调整单词难度系数，范围1.3-2.5
+- **间隔调度** - 基于EF和复习次数计算最优复习间隔
+- **当日重复** - 不熟悉的单词当天多次复习加强记忆
+- **状态管理** - New → Learning → Review → Mastered 四阶段学习流程
+
+#### 评分质量映射
+- **知道(Know)** - 质量评分5，记忆清晰无困难
+- **提示(Hint)** - 质量评分3，需要提示但能想起
+- **不知道(Unknown)** - 质量评分1，完全不记得
+
+### AI语音技术集成
+- **OpenAI Whisper** - 业界领先的语音识别技术
+- **GPT-4o-mini** - 智能对话和内容生成
+- **OpenAI TTS** - 自然流畅的语音合成
+- **Realtime API** - 毫秒级实时语音交互
+
+### 现代化UI设计
+- **Glass Morphism** - 毛玻璃美学设计风格
+- **响应式布局** - 完美适配各种设备尺寸
+- **流畅动画** - 基于Framer Motion的自然过渡
+- **深色主题** - 护眼的深色配色方案
+
+## 🔧 开发指南
+
+### 添加新功能
+1. 在`src/components/`中创建可复用组件
+2. 在`src/pages/`中创建页面组件
+3. 在`src/services/`中添加业务逻辑
+4. 更新路由配置和导航
 
 ### 部署云函数
-
 ```bash
-# 部署FSRS服务云函数
-tcb fn deploy fsrs-service
+# 部署单个云函数
+npx @cloudbase/cli functions deploy [function-name] --env cloud1-7g7oatv381500c81
+
+# 批量部署所有云函数
+npx @cloudbase/cli functions deploy --env cloud1-7g7oatv381500c81
 ```
 
-### 本地测试云托管环境
-
+### 数据库集合管理
 ```bash
-npm run start
+# 创建新集合
+npx @cloudbase/cli db createCollection [collection-name] --env cloud1-7g7oatv381500c81
+
+# 导入数据
+npx @cloudbase/cli db import [file-path] --env cloud1-7g7oatv381500c81
 ```
 
-## 📚 部署指南
-
-> 💡 **重要**: 部署前请先阅读 [部署最佳实践指南](./部署最佳实践指南.md) 和 [部署检查清单](./部署检查清单.md)
-
-### 快速部署到静态网站托管
-
-项目已成功配置静态网站托管部署，支持以下方式：
-
-#### 方式一：使用快速部署脚本（推荐）
-
-**Linux/macOS:**
+### 调试和测试
 ```bash
-./deploy.sh
-```
+# 启动本地开发
+npm run dev
 
-**Windows:**
-```batch
-deploy.bat
-```
-
-#### 方式二：手动部署命令
-```bash
-# 1. 构建项目
+# 构建测试
 npm run build
 
-# 2. 部署到静态网站托管
-cloudbase hosting deploy dist -e cloud1-7g7oatv381500c81
+# 运行测试
+npm run test
 ```
 
-#### 方式三：部署到云托管（需要按量付费环境）
-```bash
-# 前提：需要在控制台切换到按量付费模式
-cloudbase framework deploy
-```
-
-### 部署要求
-- ✅ 已安装 Node.js 18+ (当前: v22.17.0)
-- ✅ 已安装 CloudBase CLI 2.7.7+
-- ✅ 已登录 CloudBase 平台
-- ✅ 静态网站托管已开启（免费）
-- ✅ 网络代理已配置（如需要）
-- ⚠️ 云托管需要按量付费环境
-
-### 网络配置（可选）
-如果网络访问受限，请设置代理：
-```bash
-# Linux/macOS
-export HTTP_PROXY=http://127.0.0.1:7890
-export HTTPS_PROXY=http://127.0.0.1:7890
-
-# Windows PowerShell
-$env:HTTP_PROXY="http://127.0.0.1:7890"
-$env:HTTPS_PROXY="http://127.0.0.1:7890"
-```
-
-### 🚀 在线体验
-
-项目已成功部署到云开发静态网站托管，可直接访问体验：
-
-**[在线体验地址](https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com)** 
-
-> 注意：由于 CDN 缓存，新部署的内容可能需要几分钟才能生效。
-
-### FSRS背单词功能
-
-- ✅ **科学间隔重复** - 基于FSRS算法的智能复习调度
-- ✅ **4档评分系统** - Again, Hard, Good, Easy 精准评估
-- ✅ **3D翻转卡片** - 沉浸式学习体验，流畅动画效果
-- ✅ **个性化参数** - 根据学习历史自动优化算法参数
-- ✅ **学习统计** - 实时准确率、进度跟踪和学习建议
-- ✅ **语音播放** - 支持单词发音，提升学习效果
-- ✅ **状态管理** - 完整的卡片状态追踪(new→learning→review)
-- ✅ **数据持久化** - 学习记录云端存储，支持跨设备同步
-
-### 认证系统功能
-
-- ✅ **邮箱注册/登录** - 支持用户邮箱账号创建和登录
-- ✅ **匿名登录** - 无需注册，一键快速体验
-- ✅ **安全存储** - 密码使用SHA256+盐值安全哈希
-- ✅ **表单验证** - 邮箱格式和密码强度验证
-- ✅ **状态管理** - 完整的用户认证状态管理
-- ✅ **响应式设计** - 适配桌面和移动设备
-
-## 目录结构
-
-```
-├── public/               # 静态资源
-├── src/
-│   ├── components/       # 可复用组件
-│   │   ├── study/        # 学习相关组件
-│   │   │   ├── StudyCard.tsx      # 3D翻转学习卡片
-│   │   │   ├── StudyProgress.tsx  # 学习进度显示
-│   │   │   └── StudyStats.tsx     # 学习统计分析
-│   │   ├── ui/           # 基础UI组件
-│   │   └── layout/       # 布局组件
-│   ├── pages/            # 页面组件
-│   │   ├── StudyPage.tsx # 学习页面（支持进度恢复）
-│   │   ├── SettingsPage.tsx # 用户设置页面
-│   │   ├── WordbooksPage.tsx # 词书页面
-│   │   └── ...
-│   ├── services/         # 业务服务
-│   │   ├── userSettingsService.ts    # 用户设置管理
-│   │   ├── dailyPlanService.ts       # 每日计划管理
-│   │   ├── DailyPlanGenerator.ts     # 学习计划生成器
-│   │   └── wordbookService.ts        # 词书服务
-│   ├── utils/            # 工具函数
-│   │   ├── fsrs.js       # FSRS算法实现
-│   │   ├── simpleReviewAlgorithm.js  # 简化复习算法
-│   │   └── cloudbase.js  # 云开发初始化
-│   ├── contexts/         # React上下文
-│   ├── App.tsx           # 应用入口
-│   ├── main.tsx          # 渲染入口
-│   └── index.css         # 全局样式
-├── cloudfunctions/       # 云函数
-│   ├── fsrs-service/     # FSRS服务云函数
-│   ├── user-settings/    # 用户设置管理云函数
-│   └── daily-plan/       # 每日计划管理云函数
-├── scripts/              # 脚本文件
-│   ├── init-fsrs-database.js    # 数据库初始化
-│   └── import-sample-words.js   # 示例数据导入
-├── docs/                 # 文档中心
-│   ├── architecture/            # 架构设计文档
-│   ├── development/             # 开发相关文档
-│   ├── analysis/               # 分析报告
-│   ├── planning/               # 方案规划
-│   └── components/             # 组件文档
-├── index.html            # HTML 模板
-├── tailwind.config.js    # Tailwind 配置
-├── postcss.config.js     # PostCSS 配置
-├── vite.config.js        # Vite 配置
-└── package.json          # 项目依赖
-```
-
-## 🎯 每日学习目标使用指南
-
-### 功能特色
-- **自定义学习目标** - 设置每天要学习的新单词和复习单词数量
-- **自动进度保存** - 学习进度实时保存，关闭页面后可恢复
-- **智能学习计划** - 根据用户设置和学习历史生成个性化计划
-- **实时进度显示** - 清晰的进度条和完成度展示
-
-### 使用步骤
-1. **设置学习目标**：
-   - 进入"设置"页面
-   - 调整"每日新单词数量"和"每日复习单词数量"
-   - 选择预设配置（轻松/标准/强化）
-
-2. **开始学习**：
-   - 选择词书，点击"开始学习"
-   - 系统自动生成今日学习计划
-   - 实时显示学习进度
-
-3. **自动保存**：
-   - 每完成一个单词自动保存进度
-   - 关闭页面重新打开可恢复到之前位置
-   - 跨设备同步学习进度
-
-### 预设学习模式
-- **轻松模式**：新词 8个，复习 24个（适合初学者）
-- **标准模式**：新词 16个，复习 48个（推荐强度）
-- **强化模式**：新词 24个，复习 72个（高强度学习）
-
-## 🎯 FSRS背单词使用指南
-
-### 学习流程
-1. **选择词书** - 在词书页面选择适合的学习材料
-2. **开始学习** - 点击"开始学习"进入学习界面
-3. **查看单词** - 3D翻转卡片展示单词和释义
-4. **评分记忆** - 根据回忆难度选择评分（Again/Hard/Good/Easy）
-5. **智能调度** - FSRS算法自动安排下次复习时间
-
-### 评分标准
-- **Again** - 完全忘记，无法回忆
-- **Hard** - 想起来但很困难，犹豫很久
-- **Good** - 正常回忆，用时适中
-- **Easy** - 很容易想起，毫无困难
-
-### 学习建议
-- 建议每天坚持学习，形成良好习惯
-- 根据个人情况调整学习量
-- 重视困难单词的复习
-- 查看学习统计了解进展
-
-## 开始开发
-
-学习页面位于 `src/pages/StudyPage.tsx`，是FSRS背单词的核心页面。FSRS算法实现在 `src/utils/fsrs.js` 中。
-
-
-## 路由系统说明
-
-本项目使用 React Router 6 作为路由系统，并采用 HashRouter 实现路由管理，这样可以更好地兼容静态网站托管服务，避免刷新页面时出现 404 错误。
-
-
-### 当前路由结构
-
-```jsx
-<Router>
-  <div className="flex flex-col min-h-screen">
-    <main className="flex-grow">
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        {/* 可以在这里添加新的路由 */}
-        <Route path="*" element={<HomePage />} />
-      </Routes>
-    </main>
-    <Footer />
-  </div>
-</Router>
-```
-
-### 如何添加新页面和路由
-
-1. 在 `src/pages` 目录下创建新页面组件，例如 `ProductPage.jsx`：
-
-```jsx
-import React from 'react';
-
-const ProductPage = () => {
-  return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-4">产品页面</h1>
-      <p>这是产品页面的内容</p>
-    </div>
-  );
-};
-
-export default ProductPage;
-```
-
-2. 在 `App.jsx` 中导入新页面并添加路由：
-
-```jsx
-import ProductPage from './pages/ProductPage';
-
-// 在 Routes 中添加新路由
-<Routes>
-  <Route path="/" element={<HomePage />} />
-  <Route path="/products" element={<ProductPage />} />
-  <Route path="*" element={<HomePage />} />
-</Routes>
-```
-
-3. 使用 Link 组件在页面中添加导航链接：
-
-```jsx
-import { Link } from 'react-router-dom';
-
-// 在页面中添加链接
-<Link to="/products" className="btn btn-primary">前往产品页面</Link>
-```
-
-### 使用路由参数
-
-对于需要动态参数的路由，可以使用参数路径：
-
-```jsx
-// 在 App.jsx 中定义带参数的路由
-<Route path="/product/:id" element={<ProductDetailPage />} />
-
-// 在 ProductDetailPage.jsx 中获取参数
-import { useParams } from 'react-router-dom';
-
-const ProductDetailPage = () => {
-  const { id } = useParams();
-  
-  return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-4">产品详情</h1>
-      <p>产品ID: {id}</p>
-    </div>
-  );
-};
-```
-
-### 路由导航
-
-除了使用 `<Link>` 组件，还可以使用编程式导航：
-
-```jsx
-import { useNavigate } from 'react-router-dom';
-
-const ComponentWithNavigation = () => {
-  const navigate = useNavigate();
-  
-  const handleClick = () => {
-    navigate('/products');
-    // 或者带参数: navigate('/product/123');
-    // 或者返回上一页: navigate(-1);
-  };
-  
-  return (
-    <button onClick={handleClick} className="btn btn-primary">
-      前往产品页面
-    </button>
-  );
-};
-```
-
-
-
-## 云开发功能说明
-
-### 初始化云开发
-
-本模板在 `src/utils/cloudbase.js` 中集中管理云开发的初始化和匿名登录功能。这个工具文件提供了云开发示例的获取/登录，调用云函数，云存储，云数据库等能力。
-
-### 使用云数据库、云函数、云存储
-
-通过 `src/utils/cloudbase.js` 访问云开发服务：
-
-```jsx
-import { app, ensureLogin } from '../utils/cloudbase';
-
-// 数据库操作
-await ensureLogin();
-const db = app.database();
-const result = await db.collection('users').get(); // 查询数据
-await db.collection('users').add({ name: 'test' }); // 添加数据
-// 调用云函数
-const funcResult = await app.callFunction({ name: 'getEnvInfo' });
-// 文件上传
-const uploadResult = await app.uploadFile({ cloudPath: 'test.jpg', filePath: file });
-// 数据模型
-const models = app.models;
-```
-
-### 重要说明
-
-1. 在使用前请先在 `src/utils/cloudbase.js` 文件中将 `ENV_ID` 变量的值修改为您的云开发环境 ID。
-2. 本模板默认使用匿名登录，这适合快速开发和测试，但在生产环境中可能需要更严格的身份验证。
-3. 所有云开发功能都通过初始化的应用实例直接调用，无需二次封装。
-4. `ensureLogin` 方法会检查当前登录状态，如果已登录则返回当前登录状态，否则会进行匿名登录。
-5. 匿名登录状态无法使用 `logout` 方法退出，只有其他登录方式（如微信登录、邮箱登录等）可以退出。
-6. 在使用数据库、云函数、云存储等功能前，请确保在云开发控制台中已创建相应的资源。
-
-## 贡献指南
-
-欢迎贡献代码、报告问题或提出改进建议！
-
-## 许可证
-
-MIT
+## 🚀 部署流程
+
+### 完整部署步骤
+1. **构建前端**: 生成生产优化的静态文件
+2. **部署静态托管**: 上传到云开发静态网站托管
+3. **部署云函数**: 批量部署所有云函数
+4. **配置域名**: 在云开发控制台配置自定义域名
+
+### 环境配置
+- **开发环境**: 本地开发服务器
+- **预生产环境**: 云开发测试环境
+- **生产环境**: `cloud1-7g7oatv381500c81`
+
+### 监控与维护
+- 云函数日志监控
+- 数据库性能监控
+- 静态资源CDN缓存管理
+- 用户行为分析
+
+## 📊 性能优化
+
+### 前端优化
+- **代码分割** - 按需加载减少首屏时间
+- **图片优化** - WebP格式和懒加载
+- **CSS优化** - PurgeCSS去除未使用样式
+- **缓存策略** - 静态资源长期缓存
+
+### 后端优化
+- **云函数冷启动优化** - 预热和连接池
+- **数据库查询优化** - 合理使用索引
+- **CDN加速** - 静态资源全球加速
+- **API响应优化** - 数据压缩和缓存
+
+## 🔒 安全特性
+
+### 数据安全
+- 用户密码SHA256+盐值加密
+- 云数据库安全规则配置
+- API接口访问控制
+- 管理员权限分离
+
+### 隐私保护
+- 最小化数据收集
+- 用户数据加密存储
+- 符合数据保护法规
+- 透明的隐私政策
+
+## 🤝 贡献指南
+
+我们欢迎任何形式的贡献，包括但不限于：
+- 🐛 Bug修复
+- ✨ 新功能开发
+- 📝 文档改进
+- 🎨 UI/UX优化
+
+### 贡献流程
+1. Fork本项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建Pull Request
+
+## 📞 技术支持
+
+### 问题反馈
+如遇到技术问题，请提供以下信息：
+- 操作系统和浏览器版本
+- 错误截图或日志
+- 复现步骤描述
+- 预期行为说明
+
+### 联系方式
+- **项目仓库**: [GitHub Issues](your-repo-issues-url)
+- **技术文档**: [项目Wiki](your-wiki-url)
+- **更新日志**: [CHANGELOG.md](./CHANGELOG.md)
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+## 🙏 致谢
+
+感谢以下开源项目和服务：
+- [React](https://reactjs.org/) - 前端框架
+- [Tailwind CSS](https://tailwindcss.com/) - 样式框架
+- [腾讯云开发](https://tcb.cloud.tencent.com/) - 云服务平台
+- [OpenAI](https://openai.com/) - AI服务支持
+- [SM2算法](https://supermemo.guru/wiki/Algorithm_SM-2) - SuperMemo间隔重复算法
+
+---
+
+**Lexicon** - 让英语学习更智能、更高效 🚀

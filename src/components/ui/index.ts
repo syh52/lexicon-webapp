@@ -18,6 +18,9 @@ export type { ModalProps, ConfirmModalProps } from './Modal';
 export { default as Toast, ToastProvider, useToast, createToastHelpers } from './Toast';
 export type { Toast as ToastType } from './Toast';
 
+export { default as Progress } from './Progress';
+export type { ProgressProps } from './Progress';
+
 // 加载状态组件
 export { 
   PageLoader, 

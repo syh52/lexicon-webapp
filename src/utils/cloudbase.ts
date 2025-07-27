@@ -23,6 +23,7 @@ interface LoginState {
   uid?: string;
   isAnonymous?: boolean;
   user?: any;
+  appUserId?: string; // 应用层用户ID，用于数据关联映射
 }
 
 // 全局单例实例缓存
@@ -162,6 +163,7 @@ export const signInAnonymously = async (): Promise<LoginState> => {
 
 /**
  * 确保已登录（如未登录则执行匿名登录）- 智能缓存优化版本
+ * 修复版本：正确处理应用层用户ID和CloudBase匿名ID的映射关系
  * @returns 登录状态
  */
 export const ensureLogin = async (): Promise<LoginState> => {
@@ -202,6 +204,28 @@ export const ensureLogin = async (): Promise<LoginState> => {
         }
       } else {
         console.log('✅ 用户已登录');
+      }
+
+      // 🔧 关键修复：建立应用层用户ID和CloudBase用户ID的映射关系
+      if (loginState && loginState.isLoggedIn) {
+        const cloudbaseUserId = loginState.uid || loginState.user?.uid;
+        if (cloudbaseUserId) {
+          // 从localStorage获取应用层用户信息
+          const savedUser = localStorage.getItem('lexicon_user');
+          if (savedUser) {
+            try {
+              const appUser = JSON.parse(savedUser);
+              // 将CloudBase用户ID存储到应用用户信息中，用于数据关联
+              loginState.appUserId = appUser.uid;
+              console.log('🔗 用户ID映射建立:', {
+                cloudbaseUserId,
+                appUserId: appUser.uid
+              });
+            } catch (error) {
+              console.warn('解析应用用户信息失败:', error);
+            }
+          }
+        }
       }
       
       // 缓存登录状态并更新检查时间
@@ -289,6 +313,41 @@ export const updateActivity = (): void => {
 };
 
 /**
+ * 智能获取当前用户ID - 解决身份映射问题
+ * @param forDataAccess - 是否用于数据访问（学习记录等）
+ * @returns 用户ID
+ */
+export const getCurrentUserId = async (forDataAccess: boolean = true): Promise<string | null> => {
+  try {
+    // 获取当前登录状态
+    const loginState = await ensureLogin();
+    
+    if (forDataAccess) {
+      // 数据访问优先使用应用层用户ID
+      const savedUser = localStorage.getItem('lexicon_user');
+      if (savedUser) {
+        try {
+          const appUser = JSON.parse(savedUser);
+          console.log('🎯 数据访问使用应用层用户ID:', appUser.uid);
+          return appUser.uid;
+        } catch (error) {
+          console.warn('解析应用用户信息失败，回退到CloudBase ID');
+        }
+      }
+    }
+    
+    // 权限验证或其他情况使用CloudBase用户ID
+    const cloudbaseUserId = loginState?.uid || loginState?.user?.uid;
+    console.log('🔑 权限验证使用CloudBase用户ID:', cloudbaseUserId);
+    return cloudbaseUserId || null;
+    
+  } catch (error) {
+    console.error('获取用户ID失败:', error);
+    return null;
+  }
+};
+
+/**
  * 智能认证缓存 - 根据时间和活动状态决定是否需要重新检查
  */
 const shouldReauth = (): boolean => {
@@ -316,5 +375,6 @@ export default {
   getCachedLoginState,
   startKeepAlive,
   stopKeepAlive,
-  updateActivity
+  updateActivity,
+  getCurrentUserId
 };

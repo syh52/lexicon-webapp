@@ -1,4 +1,6 @@
 import { app, ensureLogin } from '../utils/cloudbase';
+import { SM2Service } from './sm2Service';
+import { SM2Card, StudyChoice, SM2CardStatus } from '../types';
 
 export interface Word {
   _id: string;
@@ -39,6 +41,9 @@ export interface StudyRecord {
 }
 
 export const wordbookService = {
+  // SM-2服务实例
+  _sm2Service: new SM2Service(),
+
   /**
    * 获取所有词书 - 统一使用云函数
    */
@@ -82,23 +87,11 @@ export const wordbookService = {
   },
 
   /**
-   * 获取待复习的卡片 - 使用FSRS云函数
+   * 获取待复习的卡片 - 使用SM-2算法
    */
-  async getDueCards(userId: string, wordbookId: string, limit?: number): Promise<any[]> {
+  async getDueCards(userId: string, wordbookId: string, limit?: number): Promise<SM2Card[]> {
     try {
-      const result = await app.callFunction({
-        name: 'fsrs-service',
-        data: {
-          action: 'getDueCards',
-          data: { userId, wordbookId, limit }
-        }
-      });
-
-      if (result.result?.success) {
-        return result.result.data || [];
-      } else {
-        throw new Error(result.result?.error || '获取待复习卡片失败');
-      }
+      return await this._sm2Service.getDueCards(userId, wordbookId, limit);
     } catch (error) {
       console.error('获取待复习卡片失败:', error);
       throw error;
@@ -106,21 +99,11 @@ export const wordbookService = {
   },
 
   /**
-   * 提交复习结果 - 使用FSRS云函数
+   * 提交复习结果 - 使用SM-2算法
    */
-  async submitReview(userId: string, cardId: string, rating: number, timeSpent?: number): Promise<void> {
+  async submitReview(userId: string, card: SM2Card, choice: StudyChoice, wordbookId: string): Promise<SM2Card> {
     try {
-      const result = await app.callFunction({
-        name: 'fsrs-service',
-        data: {
-          action: 'submitReview',
-          data: { userId, cardId, rating, timeSpent }
-        }
-      });
-
-      if (!result.result?.success) {
-        throw new Error(result.result?.error || '提交复习失败');
-      }
+      return await this._sm2Service.processStudyChoice(card, choice, userId, wordbookId);
     } catch (error) {
       console.error('提交复习失败:', error);
       throw error;
@@ -128,16 +111,19 @@ export const wordbookService = {
   },
 
   /**
-   * 保存学习记录（兼容现有代码） - 将转换为使用FSRS云函数的submitReview
+   * 保存学习记录（兼容现有代码） - 使用SM-2算法
    */
   async saveStudyRecord(record: Omit<StudyRecord, '_id'>): Promise<void> {
     try {
-      // 将旧的记录格式转换为FSRS格式
-      const rating = record.status === 'mastered' ? 4 : 
-                    record.failures > 0 ? 1 : 3; // 简化的评分映射
-      
-      const cardId = `card_${record.uid}_${record.wordId}`;
-      await this.submitReview(record.uid, cardId, rating);
+      // 如果记录包含SM-2卡片数据，直接保存
+      if (record.sm2Card) {
+        await this._sm2Service.saveSM2Record(record.sm2Card, record.uid, record.wordbookId);
+        return;
+      }
+
+      // 从旧格式创建SM-2卡片并保存
+      const sm2Card = this._sm2Service.convertToSM2Card(record as any);
+      await this._sm2Service.saveSM2Record(sm2Card, record.uid, record.wordbookId);
     } catch (error) {
       console.error('保存学习记录失败:', error);
       throw error;
@@ -145,7 +131,7 @@ export const wordbookService = {
   },
 
   /**
-   * 获取用户学习统计 - 使用FSRS云函数
+   * 获取用户学习统计 - 使用SM-2算法
    */
   async getUserStudyStats(uid: string, wordbookId?: string): Promise<{
     totalWords: number;
@@ -166,26 +152,15 @@ export const wordbookService = {
         };
       }
 
-      const result = await app.callFunction({
-        name: 'fsrs-service',
-        data: {
-          action: 'getStudyStats',
-          data: { userId: uid, wordbookId }
-        }
-      });
-
-      if (result.result?.success && result.result?.data) {
-        const stats = result.result.data;
-        return {
-          totalWords: stats.totalReviews || 0,
-          studiedWords: Math.round(stats.totalReviews * stats.accuracy / 100) || 0,
-          newWords: 0, // FSRS云函数暂不提供此统计
-          reviewWords: stats.totalReviews || 0,
-          masteredWords: 0 // 需要根据FSRS算法计算
-        };
-      } else {
-        throw new Error(result.result?.error || '获取学习统计失败');
-      }
+      const stats = await this._sm2Service.getUserStudyStats(uid, wordbookId);
+      
+      return {
+        totalWords: stats.totalCards,
+        studiedWords: stats.totalCards - stats.newCards,
+        newWords: stats.newCards,
+        reviewWords: stats.reviewCards,
+        masteredWords: stats.masteredCards
+      };
     } catch (error) {
       console.error('获取学习统计失败:', error);
       return {
@@ -203,13 +178,40 @@ export const wordbookService = {
    */
   async getUserStudyRecords(uid: string, wordbookId?: string): Promise<StudyRecord[]> {
     try {
-      // 由于FSRS云函数的数据结构不同，这里返回空数组
-      // 如需要详细记录，应该扩展FSRS云函数
-      console.warn('getUserStudyRecords已废弃，请使用getDueCards或getUserStudyStats');
-      return [];
+      if (!wordbookId) {
+        return [];
+      }
+      
+      // 获取SM-2卡片并转换为StudyRecord格式
+      const sm2Cards = await this._sm2Service.getUserSM2Records(uid, wordbookId);
+      return sm2Cards.map(card => this._sm2Service.convertToStudyRecord(card, uid, wordbookId));
     } catch (error) {
       console.error('获取学习记录失败:', error);
       return [];
+    }
+  },
+
+  /**
+   * 创建每日学习会话 - 新增SM-2功能
+   */
+  async createDailyStudySession(uid: string, wordbookId: string, maxCards: number = 50) {
+    try {
+      return await this._sm2Service.createDailySession(uid, wordbookId, maxCards);
+    } catch (error) {
+      console.error('创建每日学习会话失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取SM-2学习统计 - 新增功能
+   */
+  async getSM2StudyStats(uid: string, wordbookId: string) {
+    try {
+      return await this._sm2Service.getUserStudyStats(uid, wordbookId);
+    } catch (error) {
+      console.error('获取SM-2学习统计失败:', error);
+      throw error;
     }
   }
 };

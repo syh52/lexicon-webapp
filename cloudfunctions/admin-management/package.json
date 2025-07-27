@@ -1,0 +1,16 @@
+{
+  "name": "admin-management",
+  "version": "1.0.0",
+  "description": "管理员权限管理云函数",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.22.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["cloudbase", "admin", "management"],
+  "author": "Lexicon Admin System",
+  "license": "MIT"
+}

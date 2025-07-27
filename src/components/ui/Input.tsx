@@ -2,7 +2,7 @@ import React, { InputHTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  variant?: 'default' | 'filled' | 'outline';
+  variant?: 'default' | 'filled' | 'outline' | 'glass';
   inputSize?: 'sm' | 'md' | 'lg';
   error?: boolean;
   leftIcon?: React.ReactNode;
@@ -33,9 +33,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
 
     const baseClasses = [
-      'w-full rounded-lg transition-all duration-200',
-      'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900',
-      'disabled:cursor-not-allowed disabled:opacity-50'
+      'w-full rounded-2xl transition-all duration-200',
+      'modern-focus',
+      'disabled:cursor-not-allowed disabled:opacity-50',
+      'backdrop-blur-sm'
     ];
 
     const variants = {
@@ -55,6 +56,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         'bg-transparent border-2',
         'text-white placeholder:text-gray-500',
         error ? 'border-red-500 focus:ring-red-500' : 'border-gray-600 focus:ring-purple-500 focus:border-purple-500'
+      ],
+      glass: [
+        'glass-card border-white/20',
+        'text-white placeholder:text-gray-400',
+        'hover:bg-white/15 hover:border-white/30',
+        error ? 'border-red-400 focus:ring-red-400' : 'focus:border-purple-400 focus:ring-purple-400',
+        'focus:bg-white/20'
       ]
     };
 
@@ -152,4 +160,5 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
 Input.displayName = 'Input';
 
+export { Input };
 export default Input;

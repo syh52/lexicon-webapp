@@ -78,44 +78,6 @@ export interface StudyCard {
   originalWord: Word;
 }
 
-// FSRS 算法相关类型定义
-export interface FSRSCard {
-  due: Date;
-  stability: number;
-  difficulty: number;
-  elapsedDays: number;
-  scheduledDays: number;
-  reps: number;
-  lapses: number;
-  state: CardState;
-  lastReview?: Date;
-}
-
-export enum CardState {
-  New = 0,
-  Learning = 1,
-  Review = 2,
-  Relearning = 3,
-}
-
-export enum Rating {
-  Again = 1,
-  Hard = 2,
-  Good = 3,
-  Easy = 4,
-}
-
-export interface ReviewLog {
-  rating: Rating;
-  state: CardState;
-  due: Date;
-  stability: number;
-  difficulty: number;
-  elapsedDays: number;
-  lastElapsedDays: number;
-  scheduledDays: number;
-  review: Date;
-}
 
 // 学习记录类型定义
 export interface StudyRecord {
@@ -131,8 +93,11 @@ export interface StudyRecord {
   status: 'new' | 'learning' | 'review' | 'graduated';
   createdAt: Date;
   updatedAt?: Date;
-  fsrsCard?: FSRSCard;
-  reviewLogs?: ReviewLog[];
+  // SM-2 算法字段
+  sm2Card?: SM2Card;
+  repetitions?: number;    // SM-2 复习次数
+  EF?: number;            // SM-2 易记因子
+  interval?: number;      // SM-2 间隔天数
 }
 
 // 每日学习计划类型定义
@@ -157,9 +122,17 @@ export interface DailyStudyPlan {
 export interface DailyStudyStats {
   knownCount: number;
   unknownCount: number;
+  hintCount?: number; // SM-2新增：使用提示的数量
   accuracy: number;
   studyTime: number; // 学习时间(分钟)
   averageResponseTime: number; // 平均反应时间(秒)
+  // SM-2 专用统计
+  choiceStats?: {
+    knowCount: number;
+    hintCount: number;
+    unknownCount: number;
+  };
+  repeatCount?: number; // 当日重复次数
 }
 
 // 学习进度类型定义
@@ -169,6 +142,10 @@ export interface StudyProgress {
   studyTime: number;
   timestamp: Date;
   responseTime?: number;
+  // SM-2 扩展字段
+  choice?: StudyChoice; // 用户的具体选择
+  quality?: number;     // 对应的质量评分
+  isRepeat?: boolean;   // 是否为当日重复
 }
 
 // 学习会话类型定义
@@ -191,16 +168,8 @@ export interface UserSettings {
   soundEnabled: boolean;
   theme: 'light' | 'dark' | 'system';
   language: 'zh-CN' | 'en-US';
-  fsrsConfig?: FSRSConfig;
   createdAt: Date;
   updatedAt?: Date;
-}
-
-export interface FSRSConfig {
-  requestRetention: number;
-  maximumInterval: number;
-  w: number[];
-  enableFuzz: boolean;
 }
 
 // 统计数据类型定义
@@ -371,6 +340,55 @@ export type Theme = 'light' | 'dark' | 'system';
 export type Language = 'zh-CN' | 'en-US';
 export type MessageType = 'success' | 'error' | 'warning' | 'info';
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
+
+// SM-2 算法相关类型定义
+export interface SM2Card {
+  wordId: string;
+  repetitions: number;    // 已复习次数
+  EF: number;            // 易记因子 (Ease Factor)
+  interval: number;      // 当前间隔天数
+  nextReview: Date;      // 下次复习日期
+  lastReview?: Date;     // 上次复习时间
+  status: SM2CardStatus; // 卡片状态
+  createdAt: Date;       // 创建时间
+  updatedAt?: Date;      // 最后更新时间
+}
+
+export enum SM2CardStatus {
+  New = 'new',           // 新单词
+  Learning = 'learning', // 学习中
+  Review = 'review',     // 复习中
+  Mastered = 'mastered'  // 已掌握
+}
+
+export enum StudyChoice {
+  Know = 'know',         // 认识（质量=5）
+  Hint = 'hint',         // 提示后认识（质量=3）
+  Unknown = 'unknown'    // 不认识（质量=0-1）
+}
+
+// 每日学习会话类型
+export interface DailyStudySession {
+  cards: SM2Card[];
+  completedCards: SM2Card[];
+  repeatQueue: SM2Card[];
+  currentIndex: number;
+  isCompleted: boolean;
+}
+
+// 学习会话统计
+export interface StudySessionStats {
+  total: number;
+  completed: number;
+  remaining: number;
+  completionRate: number;
+  choiceStats: {
+    know: number;
+    hint: number;
+    unknown: number;
+  };
+  isCompleted: boolean;
+}
 
 // 工具类型定义
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
