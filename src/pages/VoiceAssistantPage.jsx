@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Play, Square, Settings, Sparkles, MessageCircle, Brain, Headphones, RotateCcw } from 'lucide-react';
+import { 
+  Mic, MicOff, Volume2, VolumeX, Play, Square, Settings, Sparkles, 
+  MessageCircle, Brain, Headphones, RotateCcw, Send, Paperclip, 
+  Image as ImageIcon, FileText, Keyboard, User, Bot, Loader2,
+  ChevronDown, X, Upload, Trash2
+} from 'lucide-react';
 import { getApp, ensureLogin, getCachedLoginState, startKeepAlive, stopKeepAlive, updateActivity } from '../utils/cloudbase';
 import { startWarmup, startKeepAlive as startFunctionKeepAlive, stopKeepAlive as stopFunctionKeepAlive, smartWarmup } from '../utils/functionKeepAlive';
 import { getCachedTTS, cacheTTS } from '../utils/ttsCache';
@@ -23,6 +28,13 @@ const VoiceAssistantPage = () => {
   const [currentModel, setCurrentModel] = useState('gpt-4o-mini');
   const [currentVoice, setCurrentVoice] = useState('alloy');
   const [authState, setAuthState] = useState('disconnected');
+
+  // 新增UI状态
+  const [textInput, setTextInput] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [inputMode, setInputMode] = useState('text'); // 'text', 'voice', 'file'
+  const [showInputOptions, setShowInputOptions] = useState(false);
 
   // 并发处理相关状态
   const [processingStage, setProcessingStage] = useState(null);
@@ -53,11 +65,22 @@ const VoiceAssistantPage = () => {
   const [apiTestResult, setApiTestResult] = useState(null);
   const [microphonePermission, setMicrophonePermission] = useState('unknown');
   const [isProcessingAudio, setIsProcessingAudio] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [replayingMessageId, setReplayingMessageId] = useState(null);
 
   const audioRecorderRef = useRef(null);
   const concurrentProcessorRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+
+  // 自动滚动到最新消息
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // 初始化并发处理器
   useEffect(() => {
@@ -79,7 +102,8 @@ const VoiceAssistantPage = () => {
                 id: Date.now(),
                 type: 'user', 
                 content: partialData.result,
-                timestamp: new Date().toLocaleTimeString()
+                timestamp: new Date().toLocaleTimeString(),
+                inputMode: 'voice'
               };
               setMessages(prev => [...prev, userMessage]);
             }
@@ -250,6 +274,7 @@ const VoiceAssistantPage = () => {
           setStatus('recording');
           setCurrentTranscript('正在录音中...');
           setError('');
+          setInputMode('voice');
         };
 
         recorder.onStop = async (audioData) => {
@@ -257,6 +282,7 @@ const VoiceAssistantPage = () => {
           setIsRecording(false);
           setStatus(isConnected ? 'connected' : 'disconnected');
           setIsProcessingAudio(true);
+          setInputMode('text'); // 录音结束后切回文本模式
 
           try {
             if (isUsingConcurrentMode && concurrentProcessorRef.current) {
@@ -286,6 +312,7 @@ const VoiceAssistantPage = () => {
           setStatus(isConnected ? 'connected' : 'disconnected');
           setCurrentTranscript('');
           setError(`录音失败: ${error.message}`);
+          setInputMode('text');
         };
 
         // 尝试初始化录音器
@@ -309,6 +336,12 @@ const VoiceAssistantPage = () => {
       if (audioRecorderRef.current) {
         audioRecorderRef.current.destroy();
       }
+      // 清理文件预览URL
+      selectedFiles.forEach(file => {
+        if (file.preview) {
+          URL.revokeObjectURL(file.preview);
+        }
+      });
     };
   }, []);
 
@@ -466,7 +499,8 @@ const VoiceAssistantPage = () => {
           content: recognizedText,
           timestamp: new Date().toLocaleTimeString(),
           method: result.result.method,
-          duration: result.result.duration
+          duration: result.result.duration,
+          inputMode: 'voice'
         };
         setMessages(prev => [...prev, userMessage]);
 
@@ -664,6 +698,70 @@ const VoiceAssistantPage = () => {
     }
   };
 
+  // 处理文本输入发送
+  const handleSendMessage = async () => {
+    const message = textInput.trim();
+    if (!message && selectedFiles.length === 0) return;
+
+    // 添加用户消息
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: message,
+      timestamp: new Date().toLocaleTimeString(),
+      inputMode: 'text',
+      files: selectedFiles.length > 0 ? [...selectedFiles] : undefined
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setTextInput('');
+    setSelectedFiles([]);
+
+    // 处理AI回复
+    try {
+      await handleAIResponse(message);
+    } catch (error) {
+      console.error('发送消息失败:', error);
+    }
+  };
+
+  // 处理文件选择
+  const handleFileSelect = (event, type) => {
+    const files = Array.from(event.target.files);
+    const newFiles = files.map(file => ({
+      id: Date.now() + Math.random(),
+      file,
+      type,
+      name: file.name,
+      size: file.size,
+      preview: type === 'image' ? URL.createObjectURL(file) : null
+    }));
+    
+    setSelectedFiles(prev => [...prev, ...newFiles]);
+    setShowInputOptions(false);
+  };
+
+  // 移除选中文件
+  const removeFile = (fileId) => {
+    setSelectedFiles(prev => {
+      const updated = prev.filter(f => f.id !== fileId);
+      // 释放预览URL
+      const removedFile = prev.find(f => f.id === fileId);
+      if (removedFile?.preview) {
+        URL.revokeObjectURL(removedFile.preview);
+      }
+      return updated;
+    });
+  };
+
+  // 处理键盘事件
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   const handleConnect = () => {
     setIsConnected(true);
     setStatus('connected');
@@ -858,19 +956,31 @@ const VoiceAssistantPage = () => {
     }
   };
 
+  // 渲染空状态
+  const renderEmptyState = () => (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-gray-400 mb-4">
+          <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
+          <p>开始对话吧...</p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-900 flex flex-col">
       {/* 顶部导航栏 */}
-      <div className="glass-card sticky top-0 z-50">
+      <div className="glass-card sticky top-0 z-50 flex-shrink-0">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Headphones className="w-6 h-6 text-white" />
+                <MessageCircle className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">AI语音助手</h1>
-                <p className="text-sm text-gray-400">智能英语对话练习</p>
+                <h1 className="text-xl font-bold text-white">AI智能助手</h1>
+                <p className="text-sm text-gray-400">多模态对话 • 智能交互</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -884,6 +994,9 @@ const VoiceAssistantPage = () => {
                 <span className="text-sm text-gray-400">
                   {authState === 'connected' ? '已连接' :
                    authState === 'connecting' ? '连接中' : '未连接'}
+                </span>
+                <span className="text-xs px-2 py-1 bg-purple-500/30 text-purple-300 rounded">
+                  {AI_MODELS.find(m => m.value === currentModel)?.label}
                 </span>
               </div>
               <button
@@ -899,7 +1012,7 @@ const VoiceAssistantPage = () => {
 
       {/* 错误提示 */}
       {error && (
-        <div className="max-w-6xl mx-auto px-6 mt-4">
+        <div className="max-w-6xl mx-auto px-6 mt-4 flex-shrink-0">
           <div className="glass-card bg-red-500/10 border-red-500/30 rounded-xl p-4">
             <div className="flex items-start space-x-3">
               <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -923,228 +1036,112 @@ const VoiceAssistantPage = () => {
       )}
 
       {/* 主要内容区域 */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="flex-1 flex overflow-hidden">
+        <div className="max-w-6xl mx-auto w-full flex">
           
-          {/* 左侧：语音录制区域 */}
-          <div className="lg:col-span-2">
-            <div className="glass-card rounded-2xl shadow-glow p-8">
-              
-              {/* 录音按钮区域 */}
-              <div className="text-center mb-8">
-                <div className="relative inline-block">
-                  <button
-                    onClick={isRecording ? handleStopRecording : handleStartRecording}
-                    disabled={!isSupported || microphonePermission === 'denied'}
-                    className={`relative w-32 h-32 rounded-full transition-all duration-300 transform hover:scale-105 btn-enhanced ${
-                      isRecording
-                        ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-lg shadow-red-500/30'
-                        : 'bg-gradient-to-br from-orange-500 to-purple-600 shadow-lg shadow-orange-500/30'
-                    } ${!isSupported || microphonePermission === 'denied' ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-xl'}`}
-                  >
-                    {isRecording ? (
-                      <Square className="w-10 h-10 text-white absolute inset-0 m-auto" />
-                    ) : (
-                      <Mic className="w-10 h-10 text-white absolute inset-0 m-auto" />
-                    )}
-                    
-                    {/* 录音动画圆环 */}
-                    {isRecording && (
-                      <div className="absolute -inset-3 rounded-full border-3 border-red-400 animate-ping"></div>
-                    )}
-                  </button>
-                </div>
-                
-                <div className="mt-6">
-                  <h2 className="text-xl font-semibold text-white mb-2">
-                    {isRecording ? '正在录音...' : '点击开始对话'}
-                  </h2>
-                  <p className="text-gray-400">
-                    {isRecording ? '说出你想要练习的内容，点击停止完成录音' : 
-                     isSupported ? '使用 OpenAI Whisper 进行高精度语音识别' : 
-                     '浏览器不支持音频录制'}
-                  </p>
-                </div>
-              </div>
-
-              {/* 当前转录显示 */}
-              {currentTranscript && (
-                <div className="glass-card bg-orange-500/10 border-orange-500/30 rounded-xl p-4 mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                      <Mic className="w-5 h-5 text-orange-400" />
-                    </div>
-                    <span className="text-orange-200 font-medium">{currentTranscript}</span>
-                    {isRecording && <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>}
-                  </div>
-                  
-                  {/* 并发处理进度条 */}
-                  {isUsingConcurrentMode && processingProgress > 0 && (
-                    <div className="mt-3">
-                      <div className="flex justify-between text-xs text-orange-300 mb-1">
-                        <span>处理进度</span>
-                        <span>{Math.round(processingProgress * 100)}%</span>
-                      </div>
-                      <div className="w-full bg-orange-500/20 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-orange-500 to-yellow-500 h-2 rounded-full transition-all duration-300 ease-out"
-                          style={{ width: `${processingProgress * 100}%` }}
-                        ></div>
-                      </div>
-                      {processingStage && (
-                        <div className="text-xs text-orange-300 mt-1 opacity-75">
-                          阶段: {processingStage}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 处理状态指示器 */}
-              {(isProcessingAudio || isAIProcessing || isPlaying) && (
-                <div className="space-y-3 mb-6">
-                  {isProcessingAudio && (
-                    <div className="glass-card bg-orange-500/10 border-orange-500/30 rounded-xl p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                          <Brain className="w-5 h-5 text-orange-400" />
-                        </div>
-                        <span className="text-orange-200 font-medium">正在识别语音...</span>
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {isAIProcessing && (
-                    <div className="glass-card bg-purple-500/10 border-purple-500/30 rounded-xl p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                          <Sparkles className="w-5 h-5 text-purple-400" />
-                        </div>
-                        <span className="text-purple-200 font-medium">AI正在思考回复...</span>
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-                          <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                          <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {isPlaying && (
-                    <div className="glass-card bg-green-500/10 border-green-500/30 rounded-xl p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-                          <Volume2 className="w-5 h-5 text-green-400" />
-                        </div>
-                        <span className="text-green-200 font-medium">AI正在朗读回复...</span>
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 音频可视化 */}
-              <div className="glass-card rounded-xl p-6 h-24 flex items-center justify-center">
-                {isRecording ? (
-                  <div className="flex items-center space-x-2">
-                    {[...Array(8)].map((_, i) => (
-                      <div 
-                        key={i}
-                        className="w-1 bg-orange-500 rounded-full animate-bounce"
-                        style={{
-                          height: `${Math.random() * 32 + 16}px`,
-                          animationDelay: `${i * 0.1}s`
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-gray-400 text-sm">音频波形显示</div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 右侧：对话记录和设置 */}
-          <div className="space-y-6">
+          {/* 主对话区域 */}
+          <div className="flex-1 flex flex-col">
             
-            {/* 对话记录 */}
-            <div className="glass-card rounded-2xl shadow-glow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <MessageCircle className="w-5 h-5 text-gray-300" />
-                  <h3 className="font-semibold text-white">对话记录</h3>
-                </div>
-                <button
-                  onClick={() => setMessages([])}
-                  className="text-sm text-gray-400 hover:text-gray-200 transition-colors"
-                >
-                  清空
-                </button>
-              </div>
-              
-              <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-thin">
+            {/* 对话消息列表 */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-4">
                 {messages.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
-                    <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>还没有对话记录</p>
-                    <p className="text-sm">开始录音与AI对话</p>
-                  </div>
+                  renderEmptyState()
                 ) : (
+                  // 对话消息
                   messages.map((message, index) => (
                     <div
                       key={index}
-                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                      className={`flex items-start space-x-3 ${
+                        message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+                      }`}
                     >
-                      <div
-                        className={`max-w-[85%] px-4 py-3 rounded-2xl ${
+                      {/* 头像 */}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        message.type === 'user' 
+                          ? 'bg-gradient-to-br from-orange-500 to-purple-600' 
+                          : 'glass-card'
+                      }`}>
+                        {message.type === 'user' ? (
+                          <User className="w-5 h-5 text-white" />
+                        ) : (
+                          <Bot className="w-5 h-5 text-gray-300" />
+                        )}
+                      </div>
+                      
+                      {/* 消息内容 */}
+                      <div className={`flex-1 max-w-3xl ${
+                        message.type === 'user' ? 'text-right' : 'text-left'
+                      }`}>
+                        <div className={`inline-block p-4 rounded-2xl ${
                           message.type === 'user'
                             ? 'bg-gradient-to-r from-orange-500 to-purple-600 text-white rounded-br-md'
                             : 'glass-card text-gray-200 rounded-bl-md'
-                        }`}
-                      >
-                        <p className="text-sm leading-relaxed">{message.content}</p>
-                        <div className="flex items-center justify-between mt-2">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs opacity-70">{message.timestamp}</span>
-                            {message.type === 'assistant' && (
-                              <button
-                                onClick={() => handleTextToSpeech(message.content, message.id)}
-                                disabled={replayingMessageId === message.id}
-                                className={`p-1 rounded-full transition-colors ${
-                                  message.type === 'user' 
-                                    ? 'hover:bg-white/20 text-white/80' 
-                                    : 'hover:bg-white/20 text-gray-300'
-                                } ${replayingMessageId === message.id ? 'animate-spin' : ''}`}
-                                title="重新播放"
-                              >
-                                {replayingMessageId === message.id ? (
-                                  <RotateCcw className="w-3 h-3" />
-                                ) : (
-                                  <Volume2 className="w-3 h-3" />
-                                )}
-                              </button>
-                            )}
-                          </div>
+                        }`}>
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                          
+                          {/* 文件附件显示 */}
+                          {message.files && message.files.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {message.files.map((file, idx) => (
+                                <div key={idx} className="flex items-center space-x-2 p-2 bg-white/10 rounded-lg">
+                                  {file.type === 'image' ? (
+                                    <ImageIcon className="w-4 h-4" />
+                                  ) : (
+                                    <FileText className="w-4 h-4" />
+                                  )}
+                                  <span className="text-xs">{file.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* 消息元信息 */}
+                        <div className={`flex items-center space-x-2 mt-2 text-xs text-gray-400 ${
+                          message.type === 'user' ? 'justify-end' : 'justify-start'
+                        }`}>
+                          <span>{message.timestamp}</span>
+                          
+                          {/* 输入方式标识 */}
+                          {message.inputMode && (
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              message.inputMode === 'voice' ? 'bg-orange-600/30 text-orange-300' :
+                              message.inputMode === 'text' ? 'bg-blue-600/30 text-blue-300' :
+                              'bg-green-600/30 text-green-300'
+                            }`}>
+                              {message.inputMode === 'voice' ? '🎙️' :
+                               message.inputMode === 'text' ? '💬' : '📎'}
+                            </span>
+                          )}
+                          
+                          {/* AI回复重播按钮 */}
+                          {message.type === 'assistant' && (
+                            <button
+                              onClick={() => handleTextToSpeech(message.content, message.id)}
+                              disabled={replayingMessageId === message.id}
+                              className={`p-1 rounded-full transition-colors hover:bg-white/20 text-gray-400 hover:text-gray-200 ${
+                                replayingMessageId === message.id ? 'animate-spin' : ''
+                              }`}
+                              title="重新播放"
+                            >
+                              {replayingMessageId === message.id ? (
+                                <Loader2 className="w-4 h-4" />
+                              ) : (
+                                <Volume2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                          
+                          {/* 方法标识 */}
                           {message.method && (
                             <span className={`text-xs px-2 py-1 rounded-full ${
                               message.method === 'openai-whisper' ? 'bg-orange-600/30 text-orange-300' :
                               message.method === 'External AI' ? 'bg-green-600/30 text-green-300' :
                               'bg-yellow-600/30 text-yellow-300'
                             }`}>
-                              {message.method === 'openai-whisper' ? '🎯' :
-                               message.method === 'External AI' ? '🤖' : '🎭'}
+                              {message.method === 'openai-whisper' ? '🎯 Whisper' :
+                               message.method === 'External AI' ? '🤖 AI' : '🎭 模拟'}
                             </span>
                           )}
                         </div>
@@ -1152,15 +1149,244 @@ const VoiceAssistantPage = () => {
                     </div>
                   ))
                 )}
+                
+                {/* 处理状态指示器 */}
+                {(isProcessingAudio || isAIProcessing || currentTranscript) && (
+                  <div className="flex items-start space-x-3">
+                    <div className="w-10 h-10 glass-card rounded-xl flex items-center justify-center">
+                      <Bot className="w-5 h-5 text-gray-300" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="glass-card px-3 py-2 rounded-lg max-w-sm">
+                        <div className="flex items-center space-x-2">
+                          {isProcessingAudio && (
+                            <>
+                              <Brain className="w-4 h-4 text-orange-400" />
+                              <span className="text-sm text-orange-200">识别中...</span>
+                            </>
+                          )}
+                          {isAIProcessing && (
+                            <>
+                              <Sparkles className="w-4 h-4 text-purple-400" />
+                              <span className="text-sm text-purple-200">思考中...</span>
+                            </>
+                          )}
+                          {currentTranscript && !isProcessingAudio && !isAIProcessing && (
+                            <>
+                              <Mic className="w-4 h-4 text-orange-400" />
+                              <span className="text-sm text-orange-200">{currentTranscript}</span>
+                            </>
+                          )}
+                          <div className="flex space-x-1">
+                            <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce"></div>
+                            <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                            <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                          </div>
+                        </div>
+                        
+                        {/* 并发处理进度条 */}
+                        {isUsingConcurrentMode && processingProgress > 0 && (
+                          <div className="mt-3">
+                            <div className="flex justify-between text-xs text-gray-300 mb-1">
+                              <span>处理进度</span>
+                              <span>{Math.round(processingProgress * 100)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-600/30 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-orange-500 to-purple-500 h-2 rounded-full transition-all duration-300 ease-out"
+                                style={{ width: `${processingProgress * 100}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div ref={messagesEndRef} />
               </div>
             </div>
 
-            {/* 设置面板 */}
-            {showSettings && (
-              <div className="glass-card rounded-2xl shadow-glow p-6">
-                <h3 className="font-semibold text-white mb-4">AI设置</h3>
+            {/* 选中文件显示 */}
+            {selectedFiles.length > 0 && (
+              <div className="px-6 pb-2">
+                <div className="glass-card rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-300">已选择文件</span>
+                    <button
+                      onClick={() => setSelectedFiles([])}
+                      className="text-gray-400 hover:text-gray-200 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedFiles.map(file => (
+                      <div key={file.id} className="flex items-center space-x-3 p-2 bg-white/5 rounded-lg">
+                        {file.type === 'image' ? (
+                          <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0">
+                            <img src={file.preview} alt={file.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 bg-blue-500/20 rounded flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-4 h-4 text-blue-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-200 truncate">{file.name}</p>
+                          <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                        <button
+                          onClick={() => removeFile(file.id)}
+                          className="text-gray-400 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 输入区域 */}
+            <div className="px-6 pb-6">
+              <div className="glass-card rounded-2xl p-4">
+                <div className="flex items-end space-x-3">
+                  
+                  {/* 输入选项按钮 */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowInputOptions(!showInputOptions)}
+                      className="p-3 rounded-xl glass-card hover:bg-white/20 transition-colors"
+                    >
+                      <Paperclip className="w-5 h-5 text-gray-300" />
+                    </button>
+                    
+                    {/* 输入选项菜单 */}
+                    {showInputOptions && (
+                      <div className="absolute bottom-full left-0 mb-2 glass-card rounded-xl p-2 min-w-48">
+                        <button
+                          onClick={() => {
+                            fileInputRef.current?.click();
+                            setShowInputOptions(false);
+                          }}
+                          className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-white/20 transition-colors text-left"
+                        >
+                          <FileText className="w-5 h-5 text-blue-400" />
+                          <span className="text-sm text-gray-200">上传文档</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            imageInputRef.current?.click();
+                            setShowInputOptions(false);
+                          }}
+                          className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-white/20 transition-colors text-left"
+                        >
+                          <ImageIcon className="w-5 h-5 text-green-400" />
+                          <span className="text-sm text-gray-200">上传图片</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 文本输入框 */}
+                  <div className="flex-1">
+                    <textarea
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder={
+                        inputMode === 'voice' ? '正在录音中...' : 
+                        isRecording ? '录音进行中...' : 
+                        '输入消息或点击麦克风说话...'
+                      }
+                      disabled={inputMode === 'voice' || isRecording}
+                      className="w-full bg-transparent text-gray-200 placeholder-gray-400 resize-none outline-none max-h-32 min-h-[2.5rem]"
+                      rows={1}
+                      style={{
+                        height: 'auto',
+                        minHeight: '2.5rem'
+                      }}
+                      onInput={(e) => {
+                        e.target.style.height = 'auto';
+                        e.target.style.height = e.target.scrollHeight + 'px';
+                      }}
+                    />
+                  </div>
+
+                  {/* 语音输入按钮 */}
+                  <button
+                    onClick={isRecording ? handleStopRecording : handleStartRecording}
+                    disabled={!isSupported || microphonePermission === 'denied'}
+                    className={`p-3 rounded-xl transition-all ${
+                      isRecording
+                        ? 'bg-gradient-to-br from-red-500 to-red-600 text-white'
+                        : 'glass-card hover:bg-white/20 text-gray-300'
+                    } ${!isSupported || microphonePermission === 'denied' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isRecording ? (
+                      <Square className="w-5 h-5" />
+                    ) : (
+                      <Mic className="w-5 h-5" />
+                    )}
+                  </button>
+
+                  {/* 发送按钮 */}
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={(!textInput.trim() && selectedFiles.length === 0) || isAIProcessing}
+                    className={`p-3 rounded-xl transition-all ${
+                      (textInput.trim() || selectedFiles.length > 0) && !isAIProcessing
+                        ? 'bg-gradient-to-br from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700'
+                        : 'glass-card text-gray-400 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    {isAIProcessing ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
                 
+                {/* 输入状态提示 */}
+                <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
+                  <div className="flex items-center space-x-4">
+                    {microphonePermission !== 'granted' && (
+                      <span className="text-yellow-400">⚠️ 需要麦克风权限</span>
+                    )}
+                    {isRecording && (
+                      <span className="text-orange-400 flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span>录音中...</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span>Enter发送 • Shift+Enter换行</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 侧边栏设置面板 */}
+          {showSettings && (
+            <div className="w-80 flex-shrink-0 border-l border-white/10">
+              <div className="p-6 h-full overflow-y-auto">
                 <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-white">AI设置</h3>
+                    <button
+                      onClick={() => setShowSettings(false)}
+                      className="text-gray-400 hover:text-gray-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
                   {/* AI模型选择 */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-3">AI模型</label>
@@ -1182,7 +1408,6 @@ const VoiceAssistantPage = () => {
                           <div className="flex items-center justify-between">
                             <div>
                               <h4 className="font-medium text-sm text-white">{model.label}</h4>
-                              <p className="text-xs text-gray-400">{model.description}</p>
                             </div>
                             {currentModel === model.value && (
                               <div className="w-3 h-3 bg-purple-500 rounded-full flex items-center justify-center">
@@ -1198,43 +1423,41 @@ const VoiceAssistantPage = () => {
                   {/* AI助手声音选择 */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-3">AI助手声音</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
                       {VOICE_OPTIONS.map((voice) => (
-                        <div key={voice.value} className="relative">
-                          <button
-                            onClick={() => {
-                              setCurrentVoice(voice.value);
-                              localStorage.setItem('ai-voice', voice.value);
-                              window.dispatchEvent(new Event('settingsChanged'));
-                              // 直接播放试听声音，使用指定的声音
-                              handleTextToSpeech(`你好，这是 ${voice.label} 的声音测试。`, `test-${voice.value}`, voice.value);
-                            }}
-                            disabled={replayingMessageId === `test-${voice.value}`}
-                            className={`w-full p-3 rounded-lg border-2 transition-all text-left btn-enhanced ${
-                              currentVoice === voice.value
-                                ? 'border-orange-500/50 bg-orange-500/20'
-                                : 'border-white/20 hover:border-white/40'
-                            } ${replayingMessageId === `test-${voice.value}` ? 'opacity-75 cursor-not-allowed' : ''}`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-medium text-sm text-white">{voice.label}</h4>
-                                <p className="text-xs text-gray-400">{voice.description}</p>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                {replayingMessageId === `test-${voice.value}` && (
-                                  <RotateCcw className="w-4 h-4 text-orange-400 animate-spin" />
-                                )}
-                                {currentVoice === voice.value && (
-                                  <div className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                  </div>
-                                )}
-                              </div>
+                        <button
+                          key={voice.value}
+                          onClick={() => {
+                            setCurrentVoice(voice.value);
+                            localStorage.setItem('ai-voice', voice.value);
+                            window.dispatchEvent(new Event('settingsChanged'));
+                            // 试听声音
+                            handleTextToSpeech(`你好，这是 ${voice.label} 的声音测试。`, `test-${voice.value}`, voice.value);
+                          }}
+                          disabled={replayingMessageId === `test-${voice.value}`}
+                          className={`w-full p-3 rounded-lg border-2 transition-all text-left btn-enhanced ${
+                            currentVoice === voice.value
+                              ? 'border-orange-500/50 bg-orange-500/20'
+                              : 'border-white/20 hover:border-white/40'
+                          } ${replayingMessageId === `test-${voice.value}` ? 'opacity-75 cursor-not-allowed' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium text-sm text-white">{voice.label}</h4>
+                              <p className="text-xs text-gray-400">{voice.description}</p>
                             </div>
-                          </button>
-
-                        </div>
+                            <div className="flex items-center space-x-2">
+                              {replayingMessageId === `test-${voice.value}` && (
+                                <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
+                              )}
+                              {currentVoice === voice.value && (
+                                <div className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center">
+                                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -1248,12 +1471,12 @@ const VoiceAssistantPage = () => {
                     <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                       <div>
                         <div className="text-sm font-medium text-white">
-                          {isUsingConcurrentMode ? '并发处理模式' : '传统串行模式'}
+                          {isUsingConcurrentMode ? '并发处理' : '串行处理'}
                         </div>
                         <div className="text-xs text-gray-400 mt-1">
                           {isUsingConcurrentMode 
-                            ? '智能预热 + 流式反馈，响应更快' 
-                            : '传统处理方式，稳定可靠'
+                            ? '智能预热，响应更快' 
+                            : '传统方式，稳定可靠'
                           }
                         </div>
                       </div>
@@ -1269,64 +1492,45 @@ const VoiceAssistantPage = () => {
                     </div>
                   </div>
 
-                  {/* 当前设置显示 */}
+                  {/* 快捷操作 */}
                   <div className="pt-4 border-t border-white/20">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-300">当前:</span>
-                        <span className="px-2 py-1 bg-purple-500/30 text-purple-300 rounded">
-                          {AI_MODELS.find(m => m.value === currentModel)?.label}
-                        </span>
-                        <span className="px-2 py-1 bg-orange-500/30 text-orange-300 rounded">
-                          {VOICE_OPTIONS.find(v => v.value === currentVoice)?.label}
-                        </span>
-                      </div>
+                    <h4 className="text-sm font-medium text-gray-300 mb-3">快捷操作</h4>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => setMessages([])}
+                        className="w-full p-3 rounded-lg glass-card hover:bg-white/20 transition-colors text-left"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Trash2 className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm text-gray-200">清空对话</span>
+                        </div>
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* 权限状态 */}
-            <div className="glass-card rounded-2xl shadow-glow p-6">
-              <h3 className="font-semibold text-white mb-4">权限状态</h3>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      microphonePermission === 'granted' ? 'bg-green-500' :
-                      microphonePermission === 'denied' ? 'bg-red-500' :
-                      'bg-yellow-500'
-                    }`}></div>
-                    <span className="text-sm text-gray-300">麦克风权限</span>
-                  </div>
-                  {microphonePermission !== 'granted' && (
-                    <button
-                      onClick={requestMicrophonePermission}
-                      className="text-xs px-3 py-1 bg-gradient-to-r from-orange-500 to-purple-600 hover:from-orange-600 hover:to-purple-700 text-white rounded-full transition-all btn-enhanced"
-                    >
-                      授权
-                    </button>
-                  )}
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      isSupported ? 'bg-green-500' : 'bg-red-500'
-                    }`}></div>
-                    <span className="text-sm text-gray-300">浏览器支持</span>
-                  </div>
-                  <span className="text-xs text-gray-400">
-                    {isSupported ? 'Chrome' : '需要Chrome'}
-                  </span>
-                </div>
-              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* 隐藏的文件输入 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".txt,.pdf,.doc,.docx,.md"
+        onChange={(e) => handleFileSelect(e, 'file')}
+        className="hidden"
+      />
+      <input
+        ref={imageInputRef}
+        type="file"
+        multiple
+        accept="image/*"
+        onChange={(e) => handleFileSelect(e, 'image')}
+        className="hidden"
+      />
     </div>
   );
 };

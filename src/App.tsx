@@ -81,7 +81,7 @@ function App() {
                 </RequireAuth>
               } />
               <Route path="/admin" element={
-                <RequireAuth requireAdmin={true}>
+                <RequireAuth>
                   <lazyRoutes.AdminPage />
                 </RequireAuth>
               } />

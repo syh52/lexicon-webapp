@@ -32,7 +32,7 @@ interface AdminStats {
 }
 
 const AdminPage: React.FC = () => {
-  const { user, isSuperAdmin, promoteWithKey } = useAuth();
+  const { user, isSuperAdmin, isAdmin, promoteWithKey } = useAuth();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'keys' | 'promote'>('dashboard');
   const [loading, setLoading] = useState(false);
   
@@ -360,39 +360,56 @@ const AdminPage: React.FC = () => {
     </div>
   );
 
-  return (
-    <RequireAdmin>
+  // 如果用户不是管理员，只显示权限提升页面
+  if (!isAdmin) {
+    return (
       <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">管理员控制面板</h1>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-bold text-gray-900">权限提升</h1>
             <p className="mt-2 text-gray-600">
-              管理系统用户、权限和配置
+              使用管理员密钥来获取管理权限
             </p>
           </div>
 
-          {renderTabs()}
-
-          {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'promote' && renderPromotePage()}
-          
-          {/* 其他标签页内容会在后续任务中实现 */}
-          {activeTab === 'users' && (
-            <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">用户管理</h3>
-              <p className="text-gray-600">用户管理功能即将推出...</p>
-            </div>
-          )}
-          
-          {activeTab === 'keys' && (
-            <div className="text-center py-12">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">密钥管理</h3>
-              <p className="text-gray-600">密钥管理功能即将推出...</p>
-            </div>
-          )}
+          {renderPromotePage()}
         </div>
       </div>
-    </RequireAdmin>
+    );
+  }
+
+  // 管理员用户显示完整的管理面板
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">管理员控制面板</h1>
+          <p className="mt-2 text-gray-600">
+            管理系统用户、权限和配置
+          </p>
+        </div>
+
+        {renderTabs()}
+
+        {activeTab === 'dashboard' && renderDashboard()}
+        {activeTab === 'promote' && renderPromotePage()}
+        
+        {/* 其他标签页内容会在后续任务中实现 */}
+        {activeTab === 'users' && (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">用户管理</h3>
+            <p className="text-gray-600">用户管理功能即将推出...</p>
+          </div>
+        )}
+        
+        {activeTab === 'keys' && (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">密钥管理</h3>
+            <p className="text-gray-600">密钥管理功能即将推出...</p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

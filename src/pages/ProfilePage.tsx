@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Progress } from '@/components/ui/Progress';
-import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Progress } from '../components/ui/Progress';
+import { Badge } from '../components/ui/Badge';
+import { useAuth } from '../contexts/AuthContext';
+import { KeyPromotionModal } from '../components/admin/KeyPromotionModal';
 import { 
   User, 
   Settings, 
@@ -14,12 +16,15 @@ import {
   BookOpen,
   Target,
   Calendar,
-  Crown
+  Crown,
+  Key,
+  Users
 } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user: authUser, logout, isLoggedIn } = useAuth();
+  const { user: authUser, logout, isLoggedIn, isAdmin, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
+  const [showPromotionModal, setShowPromotionModal] = useState(false);
 
   // 如果用户未登录，显示登录提示
   if (!isLoggedIn) {
@@ -57,6 +62,11 @@ export default function ProfilePage() {
     { icon: Target, label: '学习目标设置', description: '调整每日学习目标' },
     { icon: Bell, label: '消息通知', description: '管理提醒和通知设置' },
     { icon: Settings, label: '账户设置', description: '修改个人信息和密码' },
+    ...(isAdmin ? [
+      { icon: Users, label: '管理员面板', description: '系统管理和用户管理', action: () => navigate('/admin') }
+    ] : [
+      { icon: Key, label: '权限提升', description: '使用密钥获取管理员权限', action: () => setShowPromotionModal(true) }
+    ]),
     { icon: Shield, label: '隐私设置', description: '管理数据隐私和安全' },
     { icon: HelpCircle, label: '帮助与支持', description: '查看使用指南和联系客服' },
   ];
@@ -108,6 +118,39 @@ export default function ProfilePage() {
                   <span className="text-sm text-blue-400">{user.exp}/{user.nextLevelExp} EXP</span>
                 </div>
                 <Progress value={expProgress} className="h-2" />
+              </div>
+
+              {/* 权限信息 */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-gray-400">账户权限</span>
+                  {!isSuperAdmin && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setShowPromotionModal(true)}
+                      className="text-xs border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                    >
+                      <Key className="w-3 h-3 mr-1" />
+                      提升权限
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={isSuperAdmin ? "default" : isAdmin ? "secondary" : "outline"}>
+                    {isSuperAdmin ? "超级管理员" : isAdmin ? "管理员" : "普通用户"}
+                  </Badge>
+                  {isAdmin && (
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => navigate('/admin')}
+                      className="text-xs text-purple-400 hover:bg-purple-500/10"
+                    >
+                      管理面板
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* 统计数据 */}
@@ -176,6 +219,7 @@ export default function ProfilePage() {
             {menuItems.map((item, index) => (
               <button
                 key={index}
+                onClick={item.action || (() => {})}
                 className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-gray-800/50 transition-colors text-left"
               >
                 <div className="flex items-center space-x-3">
@@ -209,6 +253,18 @@ export default function ProfilePage() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* 权限提升弹窗 */}
+      <KeyPromotionModal
+        isOpen={showPromotionModal}
+        onClose={() => setShowPromotionModal(false)}
+        onSuccess={() => {
+          // 权限提升成功后刷新页面
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }}
+      />
     </div>
   );
 }
