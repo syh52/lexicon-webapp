@@ -106,7 +106,7 @@ export class SM2Service {
       await ensureLogin();
       
       // 🔧 关键修复：使用智能用户ID获取功能，确保数据关联正确
-      const dataUserId = await getCurrentUserId(true); // true表示用于数据访问
+      const dataUserId = await getCurrentUserId('data'); // 用于数据访问
       const queryUserId = dataUserId || uid; // 回退到传入的uid
       
       console.log('🔍 SM2服务查询学习记录:', {
@@ -146,7 +146,7 @@ export class SM2Service {
       await ensureLogin();
       
       // 🔧 关键修复：使用智能用户ID获取功能，确保数据关联正确
-      const dataUserId = await getCurrentUserId(true); // true表示用于数据访问
+      const dataUserId = await getCurrentUserId('data'); // 用于数据访问
       const saveUserId = dataUserId || uid; // 回退到传入的uid
       
       const studyRecord = this.convertToStudyRecord(card, saveUserId, wordbookId);
@@ -313,7 +313,7 @@ export class SM2Service {
   ): Promise<SM2Card[]> {
     try {
       // 🔧 关键修复：使用智能用户ID获取功能
-      const dataUserId = await getCurrentUserId(true);
+      const dataUserId = await getCurrentUserId('data');
       const actualUserId = dataUserId || uid;
       
       // 获取词书中的所有单词

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getApp, ensureLogin, getLoginState, getCachedLoginState } from '../utils/cloudbase';
+import { getApp, ensureLogin, getLoginState, getCachedLoginState, getCurrentUserId, establishUserMapping } from '../utils/cloudbase';
 import { User as UserType, ApiResponse } from '../types';
 
 interface User extends UserType {
@@ -24,6 +24,7 @@ interface AuthContextType {
   anonymousLogin: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserInfo: (userInfo: Partial<User>) => Promise<void>;
+  refreshUserFromCloud: () => Promise<void>;
   isLoggedIn: boolean;
   // 权限相关方法
   hasPermission: (permission: string) => boolean;
@@ -52,6 +53,80 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  // 从云端刷新用户权限信息
+  const refreshUserFromCloud = async () => {
+    try {
+      if (!isLoggedIn) return;
+      
+      console.log('🔄 AuthContext: 从云端刷新用户权限...');
+      
+      // 使用统一的用户ID获取方法
+      const cloudbaseUserId = await getCurrentUserId('auth');
+      if (!cloudbaseUserId) {
+        console.warn('⚠️ AuthContext: 无法获取CloudBase用户ID');
+        return;
+      }
+      
+      const app = getApp();
+      
+      // 从云端获取最新的用户权限信息
+      const result = await app.callFunction({
+        name: 'userInfo',
+        data: { 
+          action: 'get',
+          userId: cloudbaseUserId
+        }
+      });
+      
+      if (result.result?.success && result.result.data) {
+        const cloudUserData = result.result.data;
+        
+        // 合并云端权限信息到本地用户数据
+        // 如果当前没有用户对象，使用云端数据创建一个基础用户对象
+        const currentUser = user || {
+          uid: cloudUserData.uid || 'anonymous_' + Date.now(),
+          displayName: cloudUserData.displayName || '匿名用户',
+          username: 'anonymous',
+          email: '',
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous`,
+          level: 1,
+          totalWords: 0,
+          studiedWords: 0,
+          correctRate: 0,
+          streakDays: 0,
+          lastStudyDate: null,
+          isAnonymous: true
+        };
+        
+        const updatedUser: User = {
+          ...currentUser,
+          role: cloudUserData.role || 'user',
+          permissions: cloudUserData.permissions || ['basic_learning']
+        };
+        
+        setUser(updatedUser);
+        
+        // 更新本地存储
+        localStorage.setItem('lexicon_user', JSON.stringify(updatedUser));
+        
+        // 确保用户ID映射关系已建立
+        if (updatedUser.uid && cloudbaseUserId !== updatedUser.uid) {
+          establishUserMapping(cloudbaseUserId, updatedUser.uid).catch(error => {
+            console.warn('建立用户映射失败:', error);
+          });
+        }
+        
+        console.log('✅ AuthContext: 权限信息已从云端刷新', {
+          role: updatedUser.role,
+          permissions: updatedUser.permissions,
+          userMapping: { cloudbaseUserId, appUserId: updatedUser.uid }
+        });
+      }
+    } catch (error) {
+      console.error('❗ AuthContext: 从云端刷新权限失败:', error);
+    }
+  };
+
   useEffect(() => {
     // 初始化时检查本地存储的用户信息
     checkLoginStatus();
@@ -66,6 +141,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const userData = JSON.parse(savedUser);
           setUser(userData);
           setIsLoggedIn(true);
+          
+          // 如果用户已登录，从云端刷新权限信息
+          setTimeout(() => {
+            refreshUserFromCloud().catch(error => {
+              console.warn('后台刷新权限失败:', error);
+            });
+          }, 1000); // 延迟1秒执行，确保UI先渲染
+          
           } catch (parseError) {
           console.error('解析本地用户信息失败:', parseError);
           localStorage.removeItem('lexicon_user');
@@ -318,7 +401,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // 权限检查方法
+  // 权限检查方法 - 从云端实时验证权限
   const hasPermission = (permission: string): boolean => {
     if (!user || !user.permissions) return false;
     return user.permissions.includes(permission);
@@ -331,16 +414,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // 使用密钥提升权限
   const promoteWithKey = async (adminKey: string) => {
-    if (!user) {
-      throw new Error('用户未登录');
-    }
-
     setIsLoading(true);
     try {
       console.log('🔑 AuthContext: 开始权限提升...');
       
-      // 确保CloudBase实例已初始化并登录
-      await ensureLogin();
+      // 使用统一的用户ID获取方法
+      const cloudbaseUserId = await getCurrentUserId('auth');
+      if (!cloudbaseUserId) {
+        throw new Error('无法获取用户ID');
+      }
+      
+      console.log('🔍 AuthContext: 使用CloudBase用户ID:', cloudbaseUserId);
+      
       const app = getApp();
       
       // 调用权限提升云函数
@@ -348,24 +433,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         name: 'userInfo',
         data: { 
           action: 'promoteWithKey',
-          adminKey: adminKey
+          adminKey: adminKey,
+          userId: cloudbaseUserId
         }
       });
       
       if (result.result?.success) {
         const promotionData = result.result.data;
         
-        // 更新本地用户信息
-        const updatedUser: User = {
-          ...user,
-          role: promotionData.role,
-          permissions: promotionData.permissions
-        };
+        // 直接使用权限提升返回的信息更新用户状态
+        if (user) {
+          const updatedUser: User = {
+            ...user,
+            role: promotionData.role || 'user',
+            permissions: promotionData.permissions || ['basic_learning']
+          };
+          
+          setUser(updatedUser);
+          
+          // 更新本地存储
+          localStorage.setItem('lexicon_user', JSON.stringify(updatedUser));
+          
+          // 确保用户ID映射关系已建立（权限提升后重新确认映射）
+          if (updatedUser.uid && cloudbaseUserId !== updatedUser.uid) {
+            establishUserMapping(cloudbaseUserId, updatedUser.uid).catch(error => {
+              console.warn('建立用户映射失败:', error);
+            });
+          }
+          
+          console.log('🔄 AuthContext: 立即更新用户权限状态', {
+            role: updatedUser.role,
+            permissions: updatedUser.permissions,
+            userMapping: { cloudbaseUserId, appUserId: updatedUser.uid }
+          });
+        }
         
-        setUser(updatedUser);
-        
-        // 更新本地存储
-        localStorage.setItem('lexicon_user', JSON.stringify(updatedUser));
+        // 权限提升成功后，从云端重新获取完整的用户信息（作为备份验证）
+        setTimeout(() => {
+          refreshUserFromCloud().catch(error => {
+            console.warn('后台刷新权限失败:', error);
+          });
+        }, 500);
         
         console.log('✅ AuthContext: 权限提升成功', promotionData);
       } else {
@@ -391,6 +499,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     anonymousLogin,
     logout,
     updateUserInfo,
+    refreshUserFromCloud,
     isLoggedIn,
     // 权限相关方法
     hasPermission,

@@ -134,7 +134,7 @@ export class StudySessionService {
     try {
       await ensureLogin();
       
-      const dataUserId = await getCurrentUserId(true);
+      const dataUserId = await getCurrentUserId('data');
       const actualUserId = dataUserId || state.userId;
       
       const db = app.database();
@@ -188,7 +188,7 @@ export class StudySessionService {
     try {
       await ensureLogin();
       
-      const dataUserId = await getCurrentUserId(true);
+      const dataUserId = await getCurrentUserId('data');
       const actualUserId = dataUserId || userId;
       
       const db = app.database();
@@ -367,7 +367,7 @@ export class StudySessionService {
     // 清除云端记录
     try {
       await ensureLogin();
-      const dataUserId = await getCurrentUserId(true);
+      const dataUserId = await getCurrentUserId('data');
       const actualUserId = dataUserId || userId;
       
       const db = app.database();

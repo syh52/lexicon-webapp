@@ -240,18 +240,28 @@ class DailyPlanGenerator {
 exports.main = async (event, context) => {
   const { action, userId, wordbookId, date, wordId, isKnown, studyTime } = event;
   
+  // 获取当前用户ID - 优先使用CloudBase认证用户ID
+  const currentUserId = userId || context.userInfo?.uid;
+  
+  if (!currentUserId) {
+    return {
+      success: false,
+      error: '用户未登录'
+    };
+  }
+  
   try {
     switch (action) {
       case 'get':
-        return await getDailyPlan(userId, wordbookId, date);
+        return await getDailyPlan(currentUserId, wordbookId, date);
       case 'create':
-        return await createDailyPlan(userId, wordbookId, date);
+        return await createDailyPlan(currentUserId, wordbookId, date);
       case 'update':
-        return await updateStudyProgress(userId, wordbookId, wordId, isKnown, studyTime);
+        return await updateStudyProgress(currentUserId, wordbookId, wordId, isKnown, studyTime);
       case 'progress':
-        return await getCurrentProgress(userId, wordbookId);
+        return await getCurrentProgress(currentUserId, wordbookId);
       case 'stats':
-        return await getStudyStats(userId, wordbookId);
+        return await getStudyStats(currentUserId, wordbookId);
       default:
         return {
           success: false,

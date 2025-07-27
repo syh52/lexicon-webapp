@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +15,7 @@ type UploadStep = 'select' | 'preview' | 'uploading' | 'success' | 'error';
 
 export default function UploadPage() {
   const navigate = useNavigate();
-  const { user, hasPermission, isAdmin } = useAuth();
+  const { user, hasPermission, isAdmin, refreshUserFromCloud } = useAuth();
   
   const [currentStep, setCurrentStep] = useState<UploadStep>('select');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -32,7 +32,18 @@ export default function UploadPage() {
     wordCount?: number;
   } | null>(null);
 
-  // RequireAuth已确保用户已登录且具有管理员权限
+  // 在组件加载时刷新云端权限信息
+  useEffect(() => {
+    const checkAndRefreshPermissions = async () => {
+      try {
+        await refreshUserFromCloud();
+      } catch (error) {
+        console.error('刷新权限失败:', error);
+      }
+    };
+    
+    checkAndRefreshPermissions();
+  }, [refreshUserFromCloud]);
 
   const handleFileSelect = useCallback(async (file: File) => {
     try {

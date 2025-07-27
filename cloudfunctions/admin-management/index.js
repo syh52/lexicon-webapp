@@ -12,14 +12,34 @@ const db = app.database();
 exports.main = async (event, context) => {
   const { action, adminUserId, keyType, maxUses, expiresInDays, keyId } = event;
   
-  // 获取当前用户ID
-  const currentUserId = adminUserId || context.userInfo?.uid;
+  // 获取当前CloudBase用户ID
+  const cloudbaseUserId = adminUserId || context.userInfo?.uid;
   
-  if (!currentUserId) {
+  if (!cloudbaseUserId) {
     return {
       success: false,
       error: '用户未登录'
     };
+  }
+
+  // 🔧 用户ID映射：将CloudBase用户ID映射为应用层用户ID
+  let currentUserId = cloudbaseUserId;
+  try {
+    // 先查询ID映射表
+    const mappingResult = await db.collection('user_id_mapping')
+      .where({ cloudbaseUserId: cloudbaseUserId })
+      .get();
+    
+    if (mappingResult.data.length > 0) {
+      currentUserId = mappingResult.data[0].appUserId;
+      console.log('🎯 admin-management: 使用映射后的应用层用户ID:', currentUserId);
+    } else {
+      console.log('🔄 admin-management: 未找到用户映射，使用CloudBase ID:', cloudbaseUserId);
+      currentUserId = cloudbaseUserId;
+    }
+  } catch (mappingError) {
+    console.warn('⚠️ admin-management: 查询用户映射失败，使用CloudBase ID:', mappingError.message);
+    currentUserId = cloudbaseUserId;
   }
   
   try {
@@ -79,7 +99,7 @@ async function generateAdminKey(adminUserId, keyType = 'admin', maxUses = 10, ex
     }
 
     // 验证密钥类型
-    if (!['admin'].includes(keyType)) {
+    if (!['admin', 'super_admin'].includes(keyType)) {
       return {
         success: false,
         error: '无效的密钥类型'
@@ -87,7 +107,7 @@ async function generateAdminKey(adminUserId, keyType = 'admin', maxUses = 10, ex
     }
 
     // 生成随机密钥
-    const keyPrefix = keyType === 'admin' ? 'ADMIN' : 'USER';
+    const keyPrefix = keyType === 'admin' ? 'ADMIN' : keyType === 'super_admin' ? 'SUPER' : 'USER';
     const randomString = crypto.randomBytes(16).toString('hex').toUpperCase();
     const plainKey = `LEXICON_${keyPrefix}_${randomString}`;
     

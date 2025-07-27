@@ -206,14 +206,25 @@ export const ensureLogin = async (): Promise<LoginState> => {
         console.log('✅ 用户已登录');
       }
 
-      // 🔧 关键修复：获取CloudBase用户ID，不依赖localStorage
+      // 🔧 关键修复：建立应用层用户ID和CloudBase用户ID的映射关系
       if (loginState && loginState.isLoggedIn) {
         const cloudbaseUserId = loginState.uid || loginState.user?.uid;
         if (cloudbaseUserId) {
-          console.log('🔗 CloudBase用户认证成功:', {
-            cloudbaseUserId,
-            loginMethod: '直接CloudBase认证'
-          });
+          // 从localStorage获取应用层用户信息
+          const savedUser = localStorage.getItem('lexicon_user');
+          if (savedUser) {
+            try {
+              const appUser = JSON.parse(savedUser);
+              // 将CloudBase用户ID存储到应用用户信息中，用于数据关联
+              loginState.appUserId = appUser.uid;
+              console.log('🔗 用户ID映射建立:', {
+                cloudbaseUserId,
+                appUserId: appUser.uid
+              });
+            } catch (error) {
+              console.warn('解析应用用户信息失败:', error);
+            }
+          }
         }
       }
       
@@ -363,8 +374,25 @@ export const getDataUserId = async (cloudbaseUserId: string): Promise<string | n
       return appUserId;
     }
     
-    // 2. 如果没有映射，直接使用CloudBase ID作为数据ID
-    console.log('🎯 没有找到用户映射，使用CloudBase ID作为数据ID');
+    // 2. 回退到本地存储的应用用户信息
+    const savedUser = localStorage.getItem('lexicon_user');
+    if (savedUser) {
+      try {
+        const appUser = JSON.parse(savedUser);
+        if (appUser.uid) {
+          console.log('🎯 从本地存储获取应用层用户ID:', appUser.uid);
+          
+          // 异步建立映射关系（不阻塞主流程）
+          establishUserMapping(cloudbaseUserId, appUser.uid).catch(error => {
+            console.warn('建立用户映射失败:', error);
+          });
+          
+          return appUser.uid;
+        }
+      } catch (error) {
+        console.warn('解析应用用户信息失败:', error);
+      }
+    }
     
     // 3. 最后回退到CloudBase ID
     console.log('🔄 回退使用CloudBase用户ID作为数据ID:', cloudbaseUserId);

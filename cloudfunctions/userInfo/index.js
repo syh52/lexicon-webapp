@@ -9,13 +9,13 @@ const app = cloudbase.init({
 const db = app.database();
 
 exports.main = async (event, context) => {
-  const { action, userId, userInfo, displayName, email, password, type, adminKey, targetUserId, newRole } = event;
+  const { action, userId, userInfo, displayName, email, password, type, adminKey, targetUserId, newRole, cloudbaseUserId, appUserId } = event;
   const { userRecord } = context;
   
   // 获取当前用户ID - CloudBase v2 Web应用认证
   const currentUserId = userId || context.userInfo?.uid;
   
-  if (!currentUserId && !['get', 'register', 'login'].includes(action)) {
+  if (!currentUserId && !['get', 'register', 'login', 'getUserMapping', 'establishMapping'].includes(action)) {
     return {
       success: false,
       error: '用户未登录'
@@ -58,6 +58,14 @@ exports.main = async (event, context) => {
       case 'listUsers':
         // 获取用户列表（管理员功能）
         return await listUsers(currentUserId);
+        
+      case 'getUserMapping':
+        // 获取用户ID映射
+        return await getUserMapping(cloudbaseUserId);
+        
+      case 'establishMapping':
+        // 建立用户ID映射
+        return await establishMapping(cloudbaseUserId, appUserId);
         
       default:
         return {
@@ -116,6 +124,9 @@ async function getUserInfo(userId) {
         correctRate: user.correctRate,
         streakDays: user.streakDays,
         lastStudyDate: user.lastStudyDate,
+        // 权限相关字段
+        role: user.role || 'user',
+        permissions: user.permissions || ['basic_learning'],
         isNewUser: false
       }
     };
@@ -268,9 +279,7 @@ async function updateUserInfo(userId, userInfo) {
     // 更新用户信息
     const result = await db.collection('users')
       .doc(user._id)
-      .update({
-        data: updateData
-      });
+      .update(updateData);
 
     if (result.stats.updated > 0) {
       // 返回更新后的用户信息
@@ -338,9 +347,7 @@ async function updateUserInfoByIdentifier(identifier, userInfo, type = 'email') 
     // 更新用户信息
     const result = await db.collection('users')
       .doc(user._id)
-      .update({
-        data: updateData
-      });
+      .update(updateData);
 
     if (result.stats.updated > 0) {
       // 返回更新后的用户信息
@@ -593,10 +600,8 @@ async function promoteUserWithKey(userId, adminKey) {
         await db.collection('admin_keys')
           .doc(keyDoc._id)
           .update({
-            data: {
-              usedCount: keyDoc.usedCount + 1,
-              lastUsedAt: new Date()
-            }
+            usedCount: keyDoc.usedCount + 1,
+            lastUsedAt: new Date()
           });
       }
     }
@@ -608,19 +613,43 @@ async function promoteUserWithKey(userId, adminKey) {
       };
     }
 
-    // 获取用户信息
+    // 获取用户信息，如果不存在则创建
     const userResult = await db.collection('users')
       .where({ uid: userId })
       .get();
 
+    let user;
     if (userResult.data.length === 0) {
-      return {
-        success: false,
-        error: '用户不存在'
+      // 用户不存在，创建新用户
+      console.log('用户不存在，创建新用户:', userId);
+      const newUserData = {
+        uid: userId,
+        displayName: '匿名用户',
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+        level: 1,
+        totalWords: 0,
+        studiedWords: 0,
+        correctRate: 0,
+        streakDays: 0,
+        lastStudyDate: null,
+        role: 'user',
+        permissions: ['basic_learning'],
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
+      
+      const createResult = await db.collection('users').add(newUserData);
+      if (!createResult.id) {
+        return {
+          success: false,
+          error: '创建用户失败'
+        };
+      }
+      
+      user = { ...newUserData, _id: createResult.id };
+    } else {
+      user = userResult.data[0];
     }
-
-    const user = userResult.data[0];
     
     // 设置权限
     let permissions = [];
@@ -631,20 +660,21 @@ async function promoteUserWithKey(userId, adminKey) {
     }
 
     // 更新用户权限
+    console.log('准备更新用户权限，用户ID:', user._id, '目标角色:', targetRole);
     const updateResult = await db.collection('users')
       .doc(user._id)
       .update({
-        data: {
-          role: targetRole,
-          permissions: permissions,
-          adminKeyUsed: keyType,
-          promotedBy: targetRole === 'super_admin' ? 'system' : 'admin_key',
-          promotedAt: new Date(),
-          updatedAt: new Date()
-        }
+        role: targetRole,
+        permissions: permissions,
+        adminKeyUsed: keyType,
+        promotedBy: targetRole === 'super_admin' ? 'system' : 'admin_key',
+        promotedAt: new Date(),
+        updatedAt: new Date()
       });
+    
+    console.log('更新结果:', JSON.stringify(updateResult, null, 2));
 
-    if (updateResult.stats.updated > 0) {
+    if (updateResult && updateResult.updated > 0) {
       // 记录操作日志
       await db.collection('admin_logs').add({
         data: {
@@ -734,16 +764,14 @@ async function promoteUserByAdmin(adminUserId, targetUserId, newRole) {
     const updateResult = await db.collection('users')
       .doc(targetUser._id)
       .update({
-        data: {
-          role: newRole,
-          permissions: permissions,
-          promotedBy: adminUserId,
-          promotedAt: new Date(),
-          updatedAt: new Date()
-        }
+        role: newRole,
+        permissions: permissions,
+        promotedBy: adminUserId,
+        promotedAt: new Date(),
+        updatedAt: new Date()
       });
 
-    if (updateResult.stats.updated > 0) {
+    if (updateResult && updateResult.updated > 0) {
       // 记录操作日志
       await db.collection('admin_logs').add({
         data: {
@@ -841,6 +869,137 @@ async function listUsers(adminUserId) {
     return {
       success: false,
       error: '获取用户列表失败：' + error.message
+    };
+  }
+}
+
+// 获取用户ID映射
+async function getUserMapping(cloudbaseUserId) {
+  try {
+    if (!cloudbaseUserId) {
+      return {
+        success: false,
+        error: 'CloudBase用户ID不能为空'
+      };
+    }
+
+    // 查询映射关系
+    const mappingResult = await db.collection('user_id_mapping')
+      .where({ cloudbase_uid: cloudbaseUserId })
+      .get();
+
+    if (mappingResult.data.length === 0) {
+      return {
+        success: false,
+        error: '未找到用户ID映射关系'
+      };
+    }
+
+    const mapping = mappingResult.data[0];
+    return {
+      success: true,
+      data: {
+        cloudbaseUserId: mapping.cloudbase_uid,
+        appUserId: mapping.app_uid,
+        createdAt: mapping.createdAt,
+        updatedAt: mapping.updatedAt
+      }
+    };
+  } catch (error) {
+    console.error('获取用户ID映射失败:', error);
+    return {
+      success: false,
+      error: '获取用户ID映射失败：' + error.message
+    };
+  }
+}
+
+// 建立用户ID映射
+async function establishMapping(cloudbaseUserId, appUserId) {
+  try {
+    if (!cloudbaseUserId || !appUserId) {
+      return {
+        success: false,
+        error: 'CloudBase用户ID和应用用户ID都不能为空'
+      };
+    }
+
+    // 检查是否已存在映射关系
+    const existingMapping = await db.collection('user_id_mapping')
+      .where({ cloudbase_uid: cloudbaseUserId })
+      .get();
+
+    if (existingMapping.data.length > 0) {
+      // 映射已存在，检查是否需要更新
+      const existing = existingMapping.data[0];
+      if (existing.app_uid === appUserId) {
+        return {
+          success: true,
+          data: {
+            message: '用户ID映射已存在',
+            cloudbaseUserId: existing.cloudbase_uid,
+            appUserId: existing.app_uid
+          }
+        };
+      } else {
+        // 更新映射关系
+        const updateResult = await db.collection('user_id_mapping')
+          .doc(existing._id)
+          .update({
+            app_uid: appUserId,
+            updatedAt: new Date()
+          });
+
+        if (updateResult.updated > 0) {
+          return {
+            success: true,
+            data: {
+              message: '用户ID映射已更新',
+              cloudbaseUserId: cloudbaseUserId,
+              appUserId: appUserId
+            }
+          };
+        } else {
+          return {
+            success: false,
+            error: '更新用户ID映射失败'
+          };
+        }
+      }
+    } else {
+      // 创建新的映射关系
+      const mappingData = {
+        cloudbase_uid: cloudbaseUserId,
+        app_uid: appUserId,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const result = await db.collection('user_id_mapping').add(mappingData);
+
+      if (result.id) {
+        console.log('用户ID映射创建成功:', { cloudbaseUserId, appUserId });
+        return {
+          success: true,
+          data: {
+            message: '用户ID映射创建成功',
+            cloudbaseUserId: cloudbaseUserId,
+            appUserId: appUserId,
+            mappingId: result.id
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: '创建用户ID映射失败'
+        };
+      }
+    }
+  } catch (error) {
+    console.error('建立用户ID映射失败:', error);
+    return {
+      success: false,
+      error: '建立用户ID映射失败：' + error.message
     };
   }
 }

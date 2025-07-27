@@ -4,7 +4,7 @@
   "description": "管理员权限管理云函数",
   "main": "index.js",
   "dependencies": {
-    "@cloudbase/node-sdk": "^2.22.0",
+    "@cloudbase/node-sdk": "^3.10.1",
     "bcryptjs": "^2.4.3"
   },
   "scripts": {

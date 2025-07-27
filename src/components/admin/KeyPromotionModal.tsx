@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Modal } from '../ui/Modal';
+import { Modal, ModalHeader, ModalTitle, ModalContent } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Card } from '../ui/Card';
@@ -68,8 +68,12 @@ export const KeyPromotionModal: React.FC<KeyPromotionModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="权限提升">
-      <div className="space-y-6">
+    <Modal open={isOpen} onOpenChange={(open) => !open && handleClose()} size="md">
+      <ModalHeader>
+        <ModalTitle>权限提升</ModalTitle>
+      </ModalHeader>
+      <ModalContent>
+        <div className="space-y-6">
         <div className="text-center">
           <div className="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
             <svg 
@@ -187,7 +191,8 @@ export const KeyPromotionModal: React.FC<KeyPromotionModalProps> = ({
             </Button>
           </div>
         </form>
-      </div>
+        </div>
+      </ModalContent>
     </Modal>
   );
 };
