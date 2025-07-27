@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, MessageCircle, CheckCircle, User, Upload, Settings, Zap, Mic, ChevronRight } from "lucide-react";
 
 export default function HomePage() {
-  const { user, isLoggedIn, isLoading, anonymousLogin } = useAuth();
+  const { user, isLoggedIn, isLoading, anonymousLogin, isAdmin } = useAuth();
   const navigate = useNavigate();
 
   const handleDailyCheckIn = async () => {
@@ -44,7 +44,12 @@ export default function HomePage() {
   };
 
   const navigateToManage = () => {
-    navigate('/profile');
+    // 根据用户权限跳转到不同页面
+    if (isAdmin) {
+      navigate('/admin');
+    } else {
+      navigate('/profile');
+    }
   };
 
   const navigateToVoiceAssistant = () => {
@@ -172,13 +177,17 @@ export default function HomePage() {
           {isLoggedIn && (
             <div 
               onClick={navigateToManage}
-              className="glass-card rounded-2xl sm:rounded-3xl p-5 sm:p-6 md:p-8 perspective-element transform transition-all duration-200 ease-out hover:scale-105 cursor-pointer active:scale-95 btn-enhanced border-purple-500/30"
+              className={`glass-card rounded-2xl sm:rounded-3xl p-5 sm:p-6 md:p-8 perspective-element transform transition-all duration-200 ease-out hover:scale-105 cursor-pointer active:scale-95 btn-enhanced ${isAdmin ? 'border-purple-500/30' : 'border-gray-500/30'}`}
             >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-purple-600/20 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
-                <Settings className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-purple-400" />
+              <div className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 ${isAdmin ? 'bg-purple-600/20' : 'bg-gray-600/20'} rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6`}>
+                <Settings className={`h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 ${isAdmin ? 'text-purple-400' : 'text-gray-400'}`} />
               </div>
-              <h4 className="text-sm sm:text-base md:text-lg font-inter font-semibold text-white mb-2 sm:mb-3 tracking-tight">管理功能</h4>
-              <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">Management</p>
+              <h4 className="text-sm sm:text-base md:text-lg font-inter font-semibold text-white mb-2 sm:mb-3 tracking-tight">
+                {isAdmin ? '系统管理' : '个人设置'}
+              </h4>
+              <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
+                {isAdmin ? 'Admin Panel' : 'Profile'}
+              </p>
             </div>
           )}
         </div>
