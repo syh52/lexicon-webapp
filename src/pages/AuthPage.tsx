@@ -11,6 +11,8 @@ export default function AuthPage() {
     isLoggedIn, 
     login, 
     register, 
+    sendVerificationCode,
+    verifyCode,
     isLoading: authLoading 
   } = useAuth();
   const navigate = useNavigate();
@@ -36,9 +38,17 @@ export default function AuthPage() {
     username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    verificationCode: ''
   });
   const [rememberMe, setRememberMe] = useState(false);
+  
+  // 验证码相关状态
+  const [verificationStep, setVerificationStep] = useState<'email' | 'verification' | 'password'>('email');
+  const [verificationId, setVerificationId] = useState<string>('');
+  const [verificationToken, setVerificationToken] = useState<string>('');
+  const [countdown, setCountdown] = useState(0);
+  const [isUser, setIsUser] = useState(false);
 
   // 组件挂载时重置所有状态并加载记住的用户名
   useEffect(() => {
@@ -49,7 +59,8 @@ export default function AuthPage() {
       username: '',
       email: savedEmail || '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      verificationCode: ''
     });
     setRememberMe(savedRememberMe);
     setError('');
@@ -57,6 +68,11 @@ export default function AuthPage() {
     setShowPassword(false);
     setShowConfirmPassword(false);
     setPasswordStrength(0);
+    setVerificationStep('email');
+    setVerificationId('');
+    setVerificationToken('');
+    setCountdown(0);
+    setIsUser(false);
   }, []); 
 
   // 当模式切换时清空表单和消息
@@ -68,7 +84,8 @@ export default function AuthPage() {
       username: '',
       email: authMode === 'login' && savedRememberMe ? savedEmail || '' : '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      verificationCode: ''
     });
     setRememberMe(authMode === 'login' ? savedRememberMe : false);
     setError('');
@@ -76,7 +93,20 @@ export default function AuthPage() {
     setShowPassword(false);
     setShowConfirmPassword(false);
     setPasswordStrength(0);
+    setVerificationStep('email');
+    setVerificationId('');
+    setVerificationToken('');
+    setCountdown(0);
+    setIsUser(false);
   }, [authMode]);
+
+  // 倒计时效果
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
   // 如果已登录，重定向到首页
   if (isLoggedIn) {
@@ -116,6 +146,57 @@ export default function AuthPage() {
       // 如果取消记住我，立即清除保存的邮箱
       localStorage.removeItem('lexicon_remembered_email');
       localStorage.removeItem('lexicon_remember_me');
+    }
+  };
+
+  // 发送验证码
+  const handleSendVerificationCode = async () => {
+    if (!formData.email.trim()) {
+      setError('请输入邮箱地址');
+      return;
+    }
+    
+    if (!validateEmail(formData.email)) {
+      setError('请输入有效的邮箱地址');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    
+    try {
+      const result = await sendVerificationCode(formData.email);
+      setVerificationId(result.verification_id);
+      setIsUser(result.is_user);
+      setVerificationStep('verification');
+      setCountdown(60); // 60秒倒计时
+      setSuccess('验证码已发送到您的邮箱');
+    } catch (error: any) {
+      setError(error.message || '发送验证码失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 验证验证码
+  const handleVerifyCode = async () => {
+    if (!formData.verificationCode.trim()) {
+      setError('请输入验证码');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    
+    try {
+      const result = await verifyCode(formData.verificationCode, verificationId);
+      setVerificationToken(result.verification_token);
+      setVerificationStep('password');
+      setSuccess('验证码验证成功');
+    } catch (error: any) {
+      setError(error.message || '验证码错误，请重试');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -180,18 +261,6 @@ export default function AuthPage() {
       return;
     }
 
-    if (!formData.email.trim()) {
-      setError('请输入邮箱地址');
-      setLoading(false);
-      return;
-    }
-    
-    if (!validateEmail(formData.email)) {
-      setError('请输入有效的邮箱地址');
-      setLoading(false);
-      return;
-    }
-
     if (!formData.password.trim()) {
       setError('请输入密码');
       setLoading(false);
@@ -210,8 +279,20 @@ export default function AuthPage() {
       return;
     }
 
+    if (!verificationToken) {
+      setError('请先完成邮箱验证');
+      setLoading(false);
+      return;
+    }
+
     try {
-      await register(formData.email, formData.password, formData.username);
+      await register(
+        formData.email, 
+        formData.password, 
+        formData.verificationCode,
+        verificationToken,
+        formData.username
+      );
       setSuccess('注册成功！正在跳转...');
       navigate('/', { replace: true });
     } catch (error: any) {
@@ -376,115 +457,192 @@ export default function AuthPage() {
 
           {/* 注册表单 */}
           {authMode === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-5 opacity-0 animate-fade-in-up animate-delay-200">
-              {/* 用户名输入 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">用户名</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input
-                    type="text"
-                    value={formData.username}
-                    onChange={(e) => handleInputChange('username', e.target.value)}
-                    className="w-full pl-10 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all"
-                    placeholder="输入你的用户名"
-                    disabled={loading}
-                    autoComplete="username"
-                  />
-                </div>
-              </div>
-
-              {/* 邮箱输入 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">邮箱地址</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="w-full pl-10 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all"
-                    placeholder="输入你的邮箱"
-                    disabled={loading}
-                    autoComplete="email"
-                  />
-                </div>
-              </div>
-
-              {/* 密码输入 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">密码</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    className="w-full pl-10 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all"
-                    placeholder="设置你的密码"
-                    disabled={loading}
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                {/* 密码强度指示器 */}
-                {formData.password && (
-                  <div className="mt-2">
-                    <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full transition-all duration-300 rounded-full"
-                        style={getPasswordStrengthStyle()}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">{getPasswordStrengthText()}</p>
+            <form onSubmit={verificationStep === 'password' ? handleRegister : undefined} className="space-y-5 opacity-0 animate-fade-in-up animate-delay-200">
+              
+              {/* 步骤 1: 邮箱输入 */}
+              {verificationStep === 'email' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">邮箱地址</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      className="w-full pl-10 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all"
+                      placeholder="输入你的邮箱"
+                      disabled={loading}
+                      autoComplete="email"
+                    />
                   </div>
-                )}
-              </div>
-
-              {/* 确认密码输入 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">确认密码</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    className="w-full pl-10 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all"
-                    placeholder="再次输入密码"
-                    disabled={loading}
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={handleSendVerificationCode}
+                      disabled={loading || !formData.email}
+                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-xl font-medium transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? '发送中...' : '发送验证码'}
+                    </button>
+                  </div>
                 </div>
-                {/* 密码匹配提示 */}
-                {formData.confirmPassword && (
-                  <p className={`text-xs mt-1 ${formData.password === formData.confirmPassword ? 'text-green-400' : 'text-red-400'}`}>
-                    {formData.password === formData.confirmPassword ? '密码匹配' : '密码不匹配'}
-                  </p>
-                )}
-              </div>
+              )}
 
-              {/* 注册按钮 */}
-              <button
-                type="submit"
-                disabled={loading || authLoading || !formData.username || !formData.email || !formData.password || !formData.confirmPassword}
-                className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-xl font-medium transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading || authLoading ? '创建中...' : '创建账户'}
-              </button>
+              {/* 步骤 2: 验证码输入 */}
+              {verificationStep === 'verification' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    邮箱验证码
+                    <span className="text-gray-400 text-xs ml-2">已发送到 {formData.email}</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.verificationCode}
+                      onChange={(e) => handleInputChange('verificationCode', e.target.value)}
+                      className="w-full pl-4 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all text-center text-lg tracking-widest"
+                      placeholder="输入6位验证码"
+                      disabled={loading}
+                      maxLength={6}
+                      autoComplete="one-time-code"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setVerificationStep('email')}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      ← 重新输入邮箱
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendVerificationCode}
+                      disabled={loading || countdown > 0}
+                      className="text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                    >
+                      {countdown > 0 ? `${countdown}s后重发` : '重新发送'}
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={loading || !formData.verificationCode}
+                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-xl font-medium transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? '验证中...' : '验证验证码'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 步骤 3: 设置密码和用户名 */}
+              {verificationStep === 'password' && (
+                <>
+                  {/* 用户名输入 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">用户名</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <input
+                        type="text"
+                        value={formData.username}
+                        onChange={(e) => handleInputChange('username', e.target.value)}
+                        className="w-full pl-10 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all"
+                        placeholder="输入你的用户名"
+                        disabled={loading}
+                        autoComplete="username"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 密码输入 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">密码</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        className="w-full pl-10 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all"
+                        placeholder="设置你的密码"
+                        disabled={loading}
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {/* 密码强度指示器 */}
+                    {formData.password && (
+                      <div className="mt-2">
+                        <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full transition-all duration-300 rounded-full"
+                            style={getPasswordStrengthStyle()}
+                          ></div>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">{getPasswordStrengthText()}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 确认密码输入 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">确认密码</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={formData.confirmPassword}
+                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                        className="w-full pl-10 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 focus:bg-white/8 transition-all"
+                        placeholder="再次输入密码"
+                        disabled={loading}
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {/* 密码匹配提示 */}
+                    {formData.confirmPassword && (
+                      <p className={`text-xs mt-1 ${formData.password === formData.confirmPassword ? 'text-green-400' : 'text-red-400'}`}>
+                        {formData.password === formData.confirmPassword ? '密码匹配' : '密码不匹配'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setVerificationStep('verification')}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      ← 重新验证邮箱
+                    </button>
+                  </div>
+
+                  {/* 注册按钮 */}
+                  <button
+                    type="submit"
+                    disabled={loading || authLoading || !formData.username || !formData.password || !formData.confirmPassword}
+                    className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-4 rounded-xl font-medium transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading || authLoading ? '创建中...' : '创建账户'}
+                  </button>
+                </>
+              )}
             </form>
           )}
 

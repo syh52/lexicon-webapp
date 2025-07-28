@@ -4,7 +4,7 @@ import cloudbase from '@cloudbase/js-sdk';
 const ENV_ID = 'cloud1-7g7oatv381500c81';
 
 // 检查环境ID是否已配置
-const isValidEnvId = ENV_ID && ENV_ID !== 'your-env-id';
+const isValidEnvId = ENV_ID && ENV_ID.length > 0;
 
 // 应用客户端ID - 用于CloudBase v2认证
 const CLIENT_ID = 'lexicon-webapp-' + ENV_ID.split('-').pop();
@@ -24,6 +24,38 @@ interface LoginState {
   isAnonymous?: boolean;
   user?: any;
   appUserId?: string; // 应用层用户ID，用于数据关联映射
+}
+
+// 验证码相关接口
+interface VerificationRequest {
+  email: string;
+}
+
+interface VerificationResponse {
+  verification_id: string;
+  is_user: boolean;
+}
+
+interface VerifyRequest {
+  verification_code: string;
+  verification_id: string;
+}
+
+interface VerifyResponse {
+  verification_token: string;
+}
+
+interface SignUpRequest {
+  email: string;
+  verification_code: string;
+  verification_token: string;
+  password: string;
+  name?: string;
+}
+
+interface SignInRequest {
+  username: string; // 邮箱地址
+  password: string;
 }
 
 // 全局单例实例缓存
@@ -420,6 +452,219 @@ const shouldReauth = (): boolean => {
   return timeSinceLastCheck > AUTH_CACHE_DURATION || timeSinceActivity > KEEP_ALIVE_INTERVAL;
 };
 
+// ==================== 邮箱验证码认证功能 ====================
+
+/**
+ * 发送邮箱验证码
+ * @param email - 邮箱地址
+ * @returns 验证码信息
+ */
+export const sendEmailVerification = async (email: string): Promise<VerificationResponse> => {
+  try {
+    if (!email || !email.includes('@')) {
+      throw new Error('请输入有效的邮箱地址');
+    }
+
+    const auth = getAuth();
+    const verification = await auth.getVerification({
+      email: email
+    });
+
+    console.log('📧 邮箱验证码发送成功:', {
+      verification_id: verification.verification_id,
+      is_user: verification.is_user
+    });
+
+    return verification;
+  } catch (error) {
+    console.error('❌ 发送邮箱验证码失败:', error);
+    throw error;
+  }
+};
+
+/**
+ * 验证邮箱验证码
+ * @param verificationCode - 验证码
+ * @param verificationId - 验证码ID
+ * @returns 验证token
+ */
+export const verifyEmailCode = async (verificationCode: string, verificationId: string): Promise<VerifyResponse> => {
+  try {
+    if (!verificationCode || !verificationId) {
+      throw new Error('验证码和验证ID都不能为空');
+    }
+
+    const auth = getAuth();
+    const result = await auth.verify({
+      verification_code: verificationCode,
+      verification_id: verificationId
+    });
+
+    console.log('✅ 邮箱验证码验证成功');
+    return result;
+  } catch (error) {
+    console.error('❌ 验证邮箱验证码失败:', error);
+    throw error;
+  }
+};
+
+/**
+ * 邮箱验证码注册
+ * @param email - 邮箱地址
+ * @param password - 密码
+ * @param verificationCode - 验证码
+ * @param verificationToken - 验证token
+ * @param displayName - 显示名称
+ * @returns 登录状态
+ */
+export const signUpWithEmail = async (
+  email: string, 
+  password: string, 
+  verificationCode: string, 
+  verificationToken: string,
+  displayName?: string
+): Promise<LoginState> => {
+  try {
+    const auth = getAuth();
+    
+    const result = await auth.signUp({
+      email: email,
+      password: password,
+      verification_code: verificationCode,
+      verification_token: verificationToken,
+      name: displayName || email.split('@')[0]
+    });
+
+    console.log('✅ 邮箱注册原始返回:', result);
+
+    // CloudBase signUp 成功后可能需要手动获取登录状态
+    let loginState = result;
+    
+    // 如果返回的不是标准登录状态，尝试获取当前登录状态
+    if (!loginState || (!loginState.isLoggedIn && !loginState.uid)) {
+      console.log('🔄 注册后获取登录状态...');
+      loginState = await auth.getLoginState();
+      console.log('🔍 获取到的登录状态:', loginState);
+    }
+
+    // 确保有效的登录状态
+    if (!loginState || (!loginState.isLoggedIn && !loginState.uid && !loginState.user)) {
+      throw new Error('注册成功但无法获取登录状态，请尝试直接登录');
+    }
+
+    // 标准化登录状态
+    const normalizedState: LoginState = {
+      isLoggedIn: loginState.isLoggedIn || !!loginState.uid || !!loginState.user,
+      uid: loginState.uid || loginState.user?.uid,
+      user: loginState.user
+    };
+
+    console.log('✅ 邮箱注册成功:', {
+      isLoggedIn: normalizedState.isLoggedIn,
+      uid: normalizedState.uid
+    });
+
+    // 更新全局登录状态
+    globalLoginState = normalizedState;
+    isLoggedIn = normalizedState.isLoggedIn;
+    lastAuthCheck = Date.now();
+    
+    return normalizedState;
+  } catch (error) {
+    console.error('❌ 邮箱注册失败:', error);
+    throw error;
+  }
+};
+
+/**
+ * 邮箱密码登录
+ * @param email - 邮箱地址
+ * @param password - 密码
+ * @returns 登录状态
+ */
+export const signInWithEmail = async (email: string, password: string): Promise<LoginState> => {
+  try {
+    const auth = getAuth();
+    
+    const loginState = await auth.signIn({
+      username: email, // CloudBase使用username字段接收邮箱
+      password: password
+    });
+
+    console.log('✅ 邮箱登录成功:', {
+      isLoggedIn: loginState?.isLoggedIn,
+      uid: loginState?.uid
+    });
+
+    // 更新全局登录状态
+    globalLoginState = loginState;
+    isLoggedIn = loginState?.isLoggedIn || false;
+    lastAuthCheck = Date.now();
+    
+    return loginState;
+  } catch (error) {
+    console.error('❌ 邮箱登录失败:', error);
+    throw error;
+  }
+};
+
+/**
+ * 登出
+ * @returns void
+ */
+export const signOut = async (): Promise<void> => {
+  try {
+    const auth = getAuth();
+    await auth.signOut();
+    
+    // 清除全局状态
+    globalLoginState = null;
+    isLoggedIn = false;
+    lastAuthCheck = 0;
+    
+    console.log('✅ 登出成功');
+  } catch (error) {
+    console.error('❌ 登出失败:', error);
+    // 即使登出失败，也清除本地状态
+    globalLoginState = null;
+    isLoggedIn = false;
+    lastAuthCheck = 0;
+    throw error;
+  }
+};
+
+/**
+ * 检查是否有有效的CloudBase登录状态
+ * @returns 登录状态
+ */
+export const checkAuthStatus = async (): Promise<LoginState | null> => {
+  try {
+    const auth = getAuth();
+    const loginState = await auth.getLoginState();
+    
+    if (loginState && loginState.isLoggedIn) {
+      // 更新全局状态
+      globalLoginState = loginState;
+      isLoggedIn = true;
+      lastAuthCheck = Date.now();
+      
+      console.log('✅ 检测到有效的登录状态');
+      return loginState;
+    } else {
+      // 清除无效状态
+      globalLoginState = null;
+      isLoggedIn = false;
+      console.log('ℹ️ 未检测到有效的登录状态');
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ 检查认证状态失败:', error);
+    globalLoginState = null;
+    isLoggedIn = false;
+    return null;
+  }
+};
+
 // 默认导出
 export default {
   init,
@@ -439,5 +684,12 @@ export default {
   updateActivity,
   getCurrentUserId,
   getDataUserId,
-  establishUserMapping
+  establishUserMapping,
+  // 邮箱验证码相关方法
+  sendEmailVerification,
+  verifyEmailCode,
+  signUpWithEmail,
+  signInWithEmail,
+  signOut,
+  checkAuthStatus
 };
