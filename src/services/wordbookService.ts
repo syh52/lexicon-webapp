@@ -9,6 +9,7 @@ export interface Word {
   phonetic?: string;
   pos?: string;
   example?: string;
+  translation?: string;
   audioUrl?: string;
   wordbookId: string;
   createdAt?: Date;

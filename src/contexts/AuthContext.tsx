@@ -105,7 +105,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           displayName: cloudUserData.displayName || '匿名用户',
           username: 'anonymous',
           email: '',
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=anonymous`,
+          avatar: `/user-avatar.png`,
           level: 1,
           totalWords: 0,
           studiedWords: 0,
@@ -407,16 +407,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           data: { 
             action: 'getOrCreate',
             userId: loginState.uid,
-            displayName: email.split('@')[0]
+            displayName: email.split('@')[0],
+            email: email // 传递邮箱信息
           }
         });
         
         if (result.result && result.result.code === 0) {
           const userData = result.result.data;
           
-          // 添加CloudBase用户ID映射
+          // 添加CloudBase用户ID映射和邮箱信息
           const enhancedUserData = {
             ...userData,
+            email: email, // 确保邮箱信息存在
             cloudbaseUserId: loginState.uid
           };
           
@@ -498,7 +500,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             displayName: userInfo.displayName,
             username: userInfo.username || email.split('@')[0],
             email: email,
-            avatar: userInfo.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
+            avatar: userInfo.avatar || `/user-avatar.png`,
             level: userInfo.level || 1,
             totalWords: userInfo.totalWords || 0,
             studiedWords: userInfo.studiedWords || 0,

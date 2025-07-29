@@ -114,7 +114,8 @@ async function getUserInfo(userId) {
         data: {
           uid: userId,
           displayName: '新用户',
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+          email: '', // 添加空邮箱字段
+          avatar: `/user-avatar.png`,
           level: 1,
           totalWords: 0,
           studiedWords: 0,
@@ -136,6 +137,7 @@ async function getUserInfo(userId) {
       data: {
         uid: user.uid,
         displayName: user.displayName,
+        email: user.email || '', // 确保返回邮箱字段
         avatar: user.avatar,
         level: user.level,
         totalWords: user.totalWords,
@@ -181,7 +183,8 @@ async function createUserInfo(userId, userInfo = {}) {
     const userData = {
       uid: userId,
       displayName: userInfo.displayName || '新用户',
-      avatar: userInfo.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+      email: userInfo.email || '', // 添加邮箱字段
+      avatar: userInfo.avatar || `/user-avatar.png`,
       level: 1,
       totalWords: 0,
       studiedWords: 0,
@@ -247,14 +250,28 @@ async function getOrCreateUserInfo(userId, userInfo = {}) {
     });
 
     if (userResult.data.length > 0) {
-      // 用户存在，返回用户信息
+      // 用户存在，检查是否需要更新邮箱信息
       const user = userResult.data[0];
+      
+      // 如果传入了邮箱信息且用户当前没有邮箱，则更新
+      if (userInfo.email && !user.email) {
+        console.log('📧 更新用户邮箱信息:', userInfo.email);
+        await db.collection('users')
+          .doc(user._id)
+          .update({
+            email: userInfo.email,
+            updatedAt: new Date()
+          });
+        user.email = userInfo.email;
+      }
+      
       console.log('✅ 用户已存在，返回信息:', user.uid);
       return {
         code: 0,
         data: {
           uid: user.uid,
           displayName: user.displayName,
+          email: user.email || '', // 确保返回邮箱字段
           avatar: user.avatar,
           level: user.level,
           totalWords: user.totalWords,
@@ -489,7 +506,7 @@ async function promoteUserWithKey(userId, adminKey) {
       const newUserData = {
         uid: userId,
         displayName: '匿名用户',
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+        avatar: `/user-avatar.png`,
         level: 1,
         totalWords: 0,
         studiedWords: 0,

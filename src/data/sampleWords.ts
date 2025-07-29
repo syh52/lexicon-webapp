@@ -8,12 +8,14 @@ export const sampleWords = [
       {
         partOfSpeech: "interj.",
         definition: "用于问候或引起注意的感叹词",
-        example: "Hello! How are you today?"
+        example: "Hello! How are you today?",
+        translation: "你好！你今天过得怎么样？"
       },
       {
         partOfSpeech: "n.",
         definition: "问候语",
-        example: "He gave me a warm hello."
+        example: "He gave me a warm hello.",
+        translation: "他热情地跟我打了招呼。"
       }
     ],
     fsrs: {
@@ -37,12 +39,14 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "世界；地球",
-        example: "The world is full of wonderful places."
+        example: "The world is full of wonderful places.",
+        translation: "世界上有很多美妙的地方。"
       },
       {
         partOfSpeech: "n.",
         definition: "世人；人类",
-        example: "The whole world watched the Olympics."
+        example: "The whole world watched the Olympics.",
+        translation: "全世界都在观看奥运会。"
       }
     ],
     fsrs: {
@@ -66,7 +70,8 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "飞机",
-        example: "The airplane took off on schedule."
+        example: "The airplane took off on schedule.",
+        translation: "飞机按时起飞了。"
       }
     ],
     fsrs: {
@@ -90,7 +95,8 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "安全；安全性",
-        example: "Safety is our top priority."
+        example: "Safety is our top priority.",
+        translation: "安全是我们的首要任务。"
       }
     ],
     fsrs: {
@@ -114,12 +120,14 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "紧急情况；突发事件",
-        example: "In case of emergency, please follow the instructions."
+        example: "In case of emergency, please follow the instructions.",
+        translation: "遇到紧急情况时，请按照指示操作。"
       },
       {
         partOfSpeech: "adj.",
         definition: "紧急的",
-        example: "We need to make an emergency landing."
+        example: "We need to make an emergency landing.",
+        translation: "我们需要紧急降落。"
       }
     ],
     fsrs: {
@@ -143,7 +151,8 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "乘客；旅客",
-        example: "All passengers must fasten their seatbelts."
+        example: "All passengers must fasten their seatbelts.",
+        translation: "所有乘客都必须系好安全带。"
       }
     ],
     fsrs: {
@@ -167,7 +176,8 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "出发；离开",
-        example: "The departure time is 3:30 PM."
+        example: "The departure time is 3:30 PM.",
+        translation: "出发时间是下午3:30。"
       }
     ],
     fsrs: {
@@ -191,7 +201,8 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "到达；抵达",
-        example: "The arrival time is 6:45 PM."
+        example: "The arrival time is 6:45 PM.",
+        translation: "到达时间是下午6:45。"
       }
     ],
     fsrs: {
@@ -215,7 +226,8 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "船长；机长",
-        example: "The captain announced the flight delay."
+        example: "The captain announced the flight delay.",
+        translation: "机长宣布了航班延误。"
       }
     ],
     fsrs: {
@@ -239,7 +251,8 @@ export const sampleWords = [
       {
         partOfSpeech: "n.",
         definition: "机组人员；船员",
-        example: "The crew is well-trained and professional."
+        example: "The crew is well-trained and professional.",
+        translation: "机组人员训练有素且专业。"
       }
     ],
     fsrs: {

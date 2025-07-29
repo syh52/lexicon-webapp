@@ -176,11 +176,7 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
   };
 
   return (
-    <div className="text-white relative min-h-screen animate-blur-in animate-delay-200 bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
-      {/* Dynamic Background Decorations - Responsive */}
-      <div className="absolute top-20 left-4 sm:left-10 w-20 h-20 sm:w-32 sm:h-32 bg-purple-500/10 rounded-full blur-xl animate-pulse"></div>
-      <div className="absolute bottom-32 right-4 sm:right-8 w-16 h-16 sm:w-24 sm:h-24 bg-blue-500/10 rounded-full blur-lg animate-pulse" style={{animationDelay: '1s'}}></div>
-      <div className="absolute top-1/3 right-12 sm:right-20 w-12 h-12 sm:w-16 sm:h-16 bg-pink-500/10 rounded-full blur-md animate-pulse" style={{animationDelay: '2s'}}></div>
+    <div className="text-white relative min-h-screen animate-blur-in animate-delay-200">
       
       {/* Main Container - Mobile Optimized */}
       <div className="min-h-screen flex flex-col relative p-3 sm:p-6 items-center justify-start sm:justify-center z-10 space-y-3 sm:space-y-6 pt-4 sm:pt-0">
@@ -220,11 +216,6 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
               
               {/* Enhanced Front Side */}
               <div className="flashcard-front absolute inset-0 flex glass-card-strong rounded-3xl border-2 border-white/30 items-center justify-center shadow-glow-blue" style={{ backfaceVisibility: 'hidden' }}>
-                {/* Decorative elements */}
-                <div className="absolute top-4 left-4 w-3 h-3 bg-purple-400/50 rounded-full animate-pulse"></div>
-                <div className="absolute top-4 right-4 w-2 h-2 bg-blue-400/50 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
-                <div className="absolute bottom-4 left-4 w-2 h-2 bg-pink-400/50 rounded-full animate-pulse" style={{animationDelay: '1s'}}></div>
-                
                 <div className="text-center p-4 sm:p-6 md:p-8 w-full relative">
                   <div className="mb-3 sm:mb-4">
                     <div className="text-xs sm:text-sm text-purple-300 font-medium uppercase tracking-wider mb-1 sm:mb-2">VOCABULARY</div>
@@ -246,16 +237,16 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
                   
                   {/* Enhanced Hint Content - Mobile Compressed */}
                   {showHint && card.meanings?.[0]?.example && (
-                    <div className="mt-4 sm:mt-6 glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-yellow-500/40 relative overflow-hidden animate-blur-in">
-                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl sm:rounded-2xl"></div>
+                    <div className="mt-4 sm:mt-6 glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-blue-500/40 relative overflow-hidden animate-blur-in">
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-xl sm:rounded-2xl"></div>
                       <div className="relative">
                         <div className="flex items-center space-x-2 mb-2">
-                          <div className="w-5 h-5 sm:w-6 sm:h-6 bg-yellow-400/30 rounded-lg flex items-center justify-center">
-                            <span className="text-yellow-300 text-xs sm:text-sm">💡</span>
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-400/30 rounded-lg flex items-center justify-center">
+                            <span className="text-blue-300 text-xs sm:text-sm">💡</span>
                           </div>
-                          <p className="text-xs sm:text-sm text-yellow-300 font-semibold uppercase tracking-wide">提示</p>
+                          <p className="text-xs sm:text-sm text-blue-300 font-semibold uppercase tracking-wide">提示</p>
                         </div>
-                        <p className="text-sm sm:text-base text-yellow-100 italic font-medium">"{card.meanings[0].example}"</p>
+                        <p className="text-sm sm:text-base text-blue-100 italic font-medium">"{card.meanings[0].example}"</p>
                       </div>
                     </div>
                   )}
@@ -264,10 +255,6 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
 
               {/* Enhanced Back Side */}
               <div className="flashcard-back absolute inset-0 glass-card-strong rounded-3xl border-2 border-white/30 p-6 sm:p-8 shadow-glow" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                {/* Decorative elements */}
-                <div className="absolute top-4 right-4 w-3 h-3 bg-green-400/50 rounded-full animate-pulse"></div>
-                <div className="absolute bottom-4 left-4 w-2 h-2 bg-yellow-400/50 rounded-full animate-pulse" style={{animationDelay: '0.7s'}}></div>
-                
                 <div className="h-full flex flex-col justify-center relative">
                   <div className="mb-4 sm:mb-6">
                     <div className="flex items-center space-x-2 mb-3 sm:mb-4">
@@ -289,7 +276,9 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
                       <div className="relative">
                         <div className="text-xs text-green-300 font-medium uppercase tracking-wide mb-2">EXAMPLE</div>
                         <p className="text-sm sm:text-base text-white mb-2 font-medium italic">"{card.meanings[0].example}"</p>
-                        <p className="text-xs sm:text-sm text-green-200/70">"例句的中文翻译。"</p>
+                        {card.meanings[0].translation && (
+                          <p className="text-xs sm:text-sm text-green-200/70">「{card.meanings[0].translation}」</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -304,61 +293,61 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
               <>
                 <button 
                   onClick={handleKnow}
-                  className="w-full study-button-green hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-xl sm:rounded-2xl p-3 sm:p-4 space-x-3 items-center justify-center btn-enhanced modern-focus shadow-glow group"
+                  className="w-full study-button-primary hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-4 space-x-3 items-center justify-center btn-enhanced modern-focus shadow-glow group"
                 >
-                  <div className="w-6 h-6 sm:w-7 sm:h-7 bg-green-400/30 rounded-lg flex items-center justify-center group-hover:bg-green-400/50 transition-colors">
-                    <Check className="w-4 h-4 text-green-300" />
+                  <div className="w-7 h-7 bg-purple-400/30 rounded-lg flex items-center justify-center group-hover:bg-purple-400/50 transition-colors">
+                    <Check className="w-4 h-4 text-purple-300" />
                   </div>
-                  <span className="text-sm sm:text-base">认识</span>
+                  <span className="text-base">认识</span>
                 </button>
                 
                 <button 
                   onClick={handleHint}
-                  className="w-full study-button-yellow hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-5 space-x-4 items-center justify-center btn-enhanced modern-focus group"
+                  className="w-full study-button-secondary hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-4 space-x-3 items-center justify-center btn-enhanced modern-focus group"
                 >
-                  <div className="w-8 h-8 bg-yellow-400/30 rounded-xl flex items-center justify-center group-hover:bg-yellow-400/50 transition-colors">
-                    <HelpCircle className="w-5 h-5 text-yellow-300" />
+                  <div className="w-7 h-7 bg-blue-400/30 rounded-xl flex items-center justify-center group-hover:bg-blue-400/50 transition-colors">
+                    <HelpCircle className="w-4 h-4 text-blue-300" />
                   </div>
-                  <span className="text-lg">提示</span>
+                  <span className="text-base">提示</span>
                 </button>
                 
                 <button 
                   onClick={handleDontKnow}
-                  className="w-full study-button-red hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-5 space-x-4 items-center justify-center btn-enhanced modern-focus group"
+                  className="w-full study-button-accent hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-4 space-x-3 items-center justify-center btn-enhanced modern-focus group"
                 >
-                  <div className="w-8 h-8 bg-red-400/30 rounded-xl flex items-center justify-center group-hover:bg-red-400/50 transition-colors">
-                    <X className="w-5 h-5 text-red-300" />
+                  <div className="w-7 h-7 bg-indigo-400/30 rounded-xl flex items-center justify-center group-hover:bg-indigo-400/50 transition-colors">
+                    <X className="w-4 h-4 text-indigo-300" />
                   </div>
-                  <span className="text-lg">不认识</span>
+                  <span className="text-base">不认识</span>
                 </button>
               </>
             ) : (
               <>
-                <div className="text-center glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-yellow-500/40 relative overflow-hidden mb-2">
-                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10"></div>
+                <div className="text-center glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-blue-500/40 relative overflow-hidden mb-2">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-cyan-500/10"></div>
                   <div className="relative">
-                    <div className="text-xs text-yellow-300 font-semibold uppercase tracking-wide mb-1 sm:mb-2">提示已显示</div>
-                    <p className="text-xs sm:text-sm text-yellow-100 font-medium">看完提示后，你现在认识这个单词吗？</p>
+                    <div className="text-xs text-blue-300 font-semibold uppercase tracking-wide mb-1 sm:mb-2">提示已显示</div>
+                    <p className="text-xs sm:text-sm text-blue-100 font-medium">看完提示后，你现在认识这个单词吗？</p>
                   </div>
                 </div>
                 <button 
                   onClick={handleKnowAfterHint}
-                  className="w-full study-button-yellow hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-5 space-x-4 items-center justify-center btn-enhanced modern-focus group"
+                  className="w-full study-button-primary hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-4 space-x-3 items-center justify-center btn-enhanced modern-focus group"
                 >
-                  <div className="w-8 h-8 bg-yellow-400/30 rounded-xl flex items-center justify-center group-hover:bg-yellow-400/50 transition-colors">
-                    <Check className="w-5 h-5 text-yellow-300" />
+                  <div className="w-7 h-7 bg-purple-400/30 rounded-xl flex items-center justify-center group-hover:bg-purple-400/50 transition-colors">
+                    <Check className="w-4 h-4 text-purple-300" />
                   </div>
-                  <span className="text-lg">现在认识了</span>
+                  <span className="text-base">现在认识了</span>
                 </button>
                 
                 <button 
                   onClick={handleDontKnow}
-                  className="w-full study-button-red hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-5 space-x-4 items-center justify-center btn-enhanced modern-focus group"
+                  className="w-full study-button-accent hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-4 space-x-3 items-center justify-center btn-enhanced modern-focus group"
                 >
-                  <div className="w-8 h-8 bg-red-400/30 rounded-xl flex items-center justify-center group-hover:bg-red-400/50 transition-colors">
-                    <X className="w-5 h-5 text-red-300" />
+                  <div className="w-7 h-7 bg-indigo-400/30 rounded-xl flex items-center justify-center group-hover:bg-indigo-400/50 transition-colors">
+                    <X className="w-4 h-4 text-indigo-300" />
                   </div>
-                  <span className="text-lg">仍然不认识</span>
+                  <span className="text-base">还是不认识</span>
                 </button>
               </>
             )}
@@ -378,30 +367,6 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
           </button>
         </div>
 
-        {/* Enhanced Stats Footer - Compressed */}
-        <div className="w-full max-w-md animate-blur-in animate-delay-600">
-          <div className="glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-glow relative overflow-hidden">
-            {/* Decorative gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-yellow-500/5 to-blue-500/5 rounded-xl sm:rounded-2xl"></div>
-            <div className="relative">
-              <div className="text-xs text-white/60 font-semibold uppercase tracking-wide mb-2 sm:mb-3 text-center">学习统计</div>
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <div className="text-center p-2 sm:p-3 glass-card rounded-lg sm:rounded-xl border border-green-500/30">
-                  <div className="text-lg sm:text-xl font-bold text-green-400 mb-0.5">1</div>
-                  <div className="text-xs text-green-300 font-medium">已掌握</div>
-                </div>
-                <div className="text-center p-2 sm:p-3 glass-card rounded-lg sm:rounded-xl border border-yellow-500/30">
-                  <div className="text-lg sm:text-xl font-bold text-yellow-400 mb-0.5">0</div>
-                  <div className="text-xs text-yellow-300 font-medium">学习中</div>
-                </div>
-                <div className="text-center p-2 sm:p-3 glass-card rounded-lg sm:rounded-xl border border-blue-500/30">
-                  <div className="text-lg sm:text-xl font-bold text-blue-400 mb-0.5">{total - current - 1}</div>
-                  <div className="text-xs text-blue-300 font-medium">剩余</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

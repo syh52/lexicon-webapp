@@ -245,7 +245,8 @@ export default function StudyPage() {
             meanings: [{
               partOfSpeech: originalWord.pos || 'n.',
               definition: originalWord.meaning || 'No definition available',
-              example: originalWord.example || `Example with ${originalWord.word}`
+              example: originalWord.example || `Example with ${originalWord.word}`,
+              translation: originalWord.translation
             }],
             pronunciation: originalWord.phonetic || originalWord.word,
             originalWord: originalWord

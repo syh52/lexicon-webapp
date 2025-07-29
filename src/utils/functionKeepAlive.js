@@ -27,7 +27,7 @@ let isWarmedUp = false;
  */
 const pingFunction = async (functionName) => {
   try {
-    const app = getApp();
+    const app = await getApp();
     console.log(`🔥 预热云函数: ${functionName}`);
     
     // 为不同函数使用不同的轻量级测试数据

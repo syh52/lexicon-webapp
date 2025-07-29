@@ -1,6 +1,5 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import MobileNavigation from './MobileNavigation';
 import MobileHeader from './MobileHeader';
 import PerspectiveProvider from '../shared/PerspectiveProvider';
 import { BACKGROUNDS } from '../../constants/design';
@@ -44,13 +43,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <MobileHeader />
         
         {/* Main Content - 桌面端使用更合适的内边距 */}
-        <main className={`flex-grow px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 overflow-y-auto scrollbar-thin relative z-10 ${isHomePage ? 'pb-24' : 'pb-6'}`}>
+        <main className="flex-grow px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 overflow-y-auto scrollbar-thin relative z-10 pb-6">
           {children}
         </main>
       </div>
-      
-      {/* Bottom Navigation - 移出主容器，确保 fixed 定位正常工作 */}
-      {isHomePage && <MobileNavigation />}
     </PerspectiveProvider>
   );
 }

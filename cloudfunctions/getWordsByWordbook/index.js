@@ -32,6 +32,7 @@ exports.main = async (event, context) => {
       pos: true,
       phonetic: true,
       example: true,
+      translation: true,
       audioUrl: true,
       _id: true
     });

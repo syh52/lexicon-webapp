@@ -68,7 +68,7 @@ export default function MobileHeader() {
           
           {/* 用户头像 */}
           <div 
-            className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center cursor-pointer hover:bg-gray-700 transition-all duration-200 active:scale-95"
+            className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center cursor-pointer hover:bg-gray-700 transition-all duration-200 active:scale-95 overflow-hidden"
             onClick={() => {
               if (isLoggedIn) {
                 navigate('/profile');
@@ -77,9 +77,9 @@ export default function MobileHeader() {
               }
             }}
           >
-            {isLoggedIn && user?.avatar ? (
+            {isLoggedIn ? (
               <img 
-                src={user.avatar} 
+                src="/user-avatar.png" 
                 alt="用户头像" 
                 className="w-8 h-8 rounded-full object-cover"
               />

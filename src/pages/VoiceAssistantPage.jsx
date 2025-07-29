@@ -350,7 +350,7 @@ const VoiceAssistantPage = () => {
     console.log('🔄 核心语音识别开始');
     
     updateActivity();
-    const app = getApp();
+    const app = await getApp();
     
     const formatInfo = audioRecorderRef.current?.getAudioFormat();
     
@@ -380,7 +380,7 @@ const VoiceAssistantPage = () => {
     console.log('🤖 核心AI响应开始');
     
     updateActivity();
-    const app = getApp();
+    const app = await getApp();
 
     const result = await app.callFunction({
       name: 'ai-chat',
@@ -421,7 +421,7 @@ const VoiceAssistantPage = () => {
     try {
       // 更新活动时间戳（移除重复的认证调用）
       updateActivity();
-      const app = getApp();
+      const app = await getApp();
 
       // 获取音频格式信息
       const formatInfo = audioRecorderRef.current?.getAudioFormat();
@@ -549,7 +549,7 @@ const VoiceAssistantPage = () => {
 
       // 更新活动时间戳（移除重复的认证调用）
       updateActivity();
-      const app = getApp();
+      const app = await getApp();
 
       // 调用ai-chat云函数（增加超时设置）
       const result = await app.callFunction({
@@ -820,7 +820,7 @@ const VoiceAssistantPage = () => {
       
       // 缓存未命中，调用云函数TTS
       console.log('💫 缓存未命中，调用云函数TTS');
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'text-to-speech',
@@ -895,7 +895,7 @@ const VoiceAssistantPage = () => {
       
       // 更新活动时间戳（移除重复的认证调用）
       updateActivity();
-      const app = getApp();
+      const app = await getApp();
       
       // 调用云函数进行API测试（增加超时设置）
       const result = await app.callFunction({
@@ -970,41 +970,53 @@ const VoiceAssistantPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
-      {/* 顶部导航栏 */}
-      <div className="glass-card sticky top-0 z-50 flex-shrink-0">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <MessageCircle className="w-6 h-6 text-white" />
+      {/* Hero区域 - 现代化设计 */}
+      <div className="relative perspective-element animate-blur-in animate-delay-200 sticky top-0 z-50 flex-shrink-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-purple-500/20 rounded-b-3xl blur-sm"></div>
+        <div className="relative glass-card rounded-b-3xl p-6 sm:p-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4 sm:space-x-6">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-gradient-to-br from-orange-500 to-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center">
+                  <MessageCircle className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-white" />
+                </div>
+                <div>
+                  <div className="text-xs sm:text-sm font-medium text-orange-400 mb-1 tracking-wide uppercase">
+                    AI助手
+                  </div>
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-inter font-semibold text-white mb-1">
+                    智能语音助手
+                  </h1>
+                  <p className="text-sm sm:text-base text-gray-400">
+                    多模态对话 • 智能交互
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">AI智能助手</h1>
-                <p className="text-sm text-gray-400">多模态对话 • 智能交互</p>
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                {/* 状态指示器 */}
+                <div className="glass-card rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${
+                      authState === 'connected' ? 'bg-green-500' :
+                      authState === 'connecting' ? 'bg-yellow-500' :
+                      'bg-red-500'
+                    }`}></div>
+                    <span className="text-xs sm:text-sm text-gray-400">
+                      {authState === 'connected' ? '已连接' :
+                       authState === 'connecting' ? '连接中' : '未连接'}
+                    </span>
+                    <span className="text-xs px-2 py-1 bg-purple-500/30 text-purple-300 rounded-lg">
+                      {AI_MODELS.find(m => m.value === currentModel)?.label}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="glass-card p-2 sm:p-3 rounded-2xl hover:bg-white/20 transition-all duration-200 hover:scale-105 active:scale-95 modern-focus"
+                >
+                  <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-gray-300" />
+                </button>
               </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              {/* 状态指示器 */}
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  authState === 'connected' ? 'bg-green-500' :
-                  authState === 'connecting' ? 'bg-yellow-500' :
-                  'bg-red-500'
-                }`}></div>
-                <span className="text-sm text-gray-400">
-                  {authState === 'connected' ? '已连接' :
-                   authState === 'connecting' ? '连接中' : '未连接'}
-                </span>
-                <span className="text-xs px-2 py-1 bg-purple-500/30 text-purple-300 rounded">
-                  {AI_MODELS.find(m => m.value === currentModel)?.label}
-                </span>
-              </div>
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="p-2 rounded-lg glass-card hover:bg-white/20 transition-colors"
-              >
-                <Settings className="w-5 h-5 text-gray-300" />
-              </button>
             </div>
           </div>
         </div>
@@ -1103,18 +1115,6 @@ const VoiceAssistantPage = () => {
                         }`}>
                           <span>{message.timestamp}</span>
                           
-                          {/* 输入方式标识 */}
-                          {message.inputMode && (
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              message.inputMode === 'voice' ? 'bg-orange-600/30 text-orange-300' :
-                              message.inputMode === 'text' ? 'bg-blue-600/30 text-blue-300' :
-                              'bg-green-600/30 text-green-300'
-                            }`}>
-                              {message.inputMode === 'voice' ? '🎙️' :
-                               message.inputMode === 'text' ? '💬' : '📎'}
-                            </span>
-                          )}
-                          
                           {/* AI回复重播按钮 */}
                           {message.type === 'assistant' && (
                             <button
@@ -1131,18 +1131,6 @@ const VoiceAssistantPage = () => {
                                 <Volume2 className="w-4 h-4" />
                               )}
                             </button>
-                          )}
-                          
-                          {/* 方法标识 */}
-                          {message.method && (
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              message.method === 'openai-whisper' ? 'bg-orange-600/30 text-orange-300' :
-                              message.method === 'External AI' ? 'bg-green-600/30 text-green-300' :
-                              'bg-yellow-600/30 text-yellow-300'
-                            }`}>
-                              {message.method === 'openai-whisper' ? '🎯 Whisper' :
-                               message.method === 'External AI' ? '🤖 AI' : '🎭 模拟'}
-                            </span>
                           )}
                         </div>
                       </div>

@@ -95,12 +95,12 @@ export default function ProfilePage() {
           <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
             {/* 头像 */}
             <div className="relative flex-shrink-0">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                {user.avatar ? (
-                  <img src={user.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  <User className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
-                )}
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/user-avatar.png" 
+                  alt="用户头像" 
+                  className="w-full h-full rounded-full object-cover" 
+                />
               </div>
               <div className="absolute -bottom-1 -right-1 bg-yellow-500 rounded-full p-1">
                 <Crown className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
