@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Progress } from '@/components/ui/Progress';
 import { BookOpen, Play, BarChart3 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { app } from '../utils/cloudbase';
+import { getApp } from '../utils/cloudbase';
 
 interface Wordbook {
   _id: string;
@@ -49,6 +49,7 @@ export default function WordbooksPage() {
       // RequireAuth已确保用户已登录，无需再次检查
       
       // 调用云函数获取真实数据
+      const app = await getApp();
       const result = await app.callFunction({
         name: 'getWordbooks',
         data: {}

@@ -388,8 +388,8 @@ async function handleBatchUpdateCards(data) {
     throw new Error('缺少必要参数: userId, wordbookId, updates');
   }
   
-  const batch = db.batch();
   const results = [];
+  const promises = [];
   
   for (const update of updates) {
     const { wordId, choice, card } = update;
@@ -421,9 +421,10 @@ async function handleBatchUpdateCards(data) {
       updatedAt: updatedCard.updatedAt
     };
     
-    // 添加到批量操作
-    const docRef = db.collection('study_records').doc();
-    batch.set(docRef, studyRecord);
+    // 添加到并发操作队列
+    promises.push(
+      db.collection('study_records').add(studyRecord)
+    );
     
     results.push({
       wordId,
@@ -432,14 +433,19 @@ async function handleBatchUpdateCards(data) {
     });
   }
   
-  // 执行批量操作
-  await batch.commit();
-  
-  return {
-    success: true,
-    data: results,
-    count: results.length
-  };
+  // 执行并发操作
+  try {
+    await Promise.all(promises);
+    
+    return {
+      success: true,
+      data: results,
+      count: results.length
+    };
+  } catch (error) {
+    console.error('批量操作失败:', error);
+    throw new Error(`批量更新失败: ${error.message}`);
+  }
 }
 
 /**

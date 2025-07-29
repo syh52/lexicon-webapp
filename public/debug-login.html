@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CloudBase登录调试</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>CloudBase登录调试</h1>
+    
+    <div>
+        <h3>测试邮箱登录</h3>
+        <input type="email" id="email" placeholder="邮箱" value="beelzebub1949@gmail.com">
+        <input type="password" id="password" placeholder="密码" value="65696788">
+        <button onclick="testLogin()">测试登录</button>
+    </div>
+    
+    <div>
+        <h3>测试发送验证码</h3>
+        <input type="email" id="regEmail" placeholder="邮箱" value="beelzebub1949@gmail.com">
+        <button onclick="testSendCode()">发送验证码</button>
+    </div>
+    
+    <div>
+        <h3>检查当前登录状态</h3>
+        <button onclick="checkLoginState()">检查状态</button>
+    </div>
+    
+    <div id="result" style="margin-top: 20px; white-space: pre-wrap; background: #f5f5f5; padding: 10px;"></div>
+
+    <script src="https://imgcache.qq.com/qcloud/tcbjs/1.15.1/tcb.js"></script>
+    <script>
+        // 初始化CloudBase
+        const app = tcb.init({
+            env: 'cloud1-7g7oatv381500c81'
+        });
+        
+        const auth = app.auth();
+        const db = app.database();
+        
+        function log(message) {
+            const result = document.getElementById('result');
+            result.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+        }
+        
+        async function testLogin() {
+            log('开始测试邮箱登录...');
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const loginResult = await auth.signIn({
+                    username: email,
+                    password: password
+                });
+                
+                log('✅ 登录成功: ' + JSON.stringify(loginResult, null, 2));
+                
+                // 获取登录状态
+                const loginState = await auth.getLoginState();
+                log('当前登录状态: ' + JSON.stringify(loginState, null, 2));
+                
+            } catch (error) {
+                log('❌ 登录失败: ' + error.message);
+                log('错误详情: ' + JSON.stringify(error, null, 2));
+            }
+        }
+        
+        async function testSendCode() {
+            log('开始测试发送验证码...');
+            
+            const email = document.getElementById('regEmail').value;
+            
+            try {
+                const result = await auth.sendEmailVerification(email);
+                log('✅ 验证码发送成功: ' + JSON.stringify(result, null, 2));
+            } catch (error) {
+                log('❌ 发送验证码失败: ' + error.message);
+                log('错误详情: ' + JSON.stringify(error, null, 2));
+            }
+        }
+        
+        async function checkLoginState() {
+            log('检查当前登录状态...');
+            
+            try {
+                const loginState = await auth.getLoginState();
+                log('当前登录状态: ' + JSON.stringify(loginState, null, 2));
+                
+                if (loginState && loginState.isLoggedIn) {
+                    // 查询数据库中的用户信息
+                    const userQuery = await db.collection('users').where({
+                        uid: loginState.uid
+                    }).get();
+                    
+                    log('数据库用户信息: ' + JSON.stringify(userQuery.data, null, 2));
+                }
+                
+            } catch (error) {
+                log('❌ 检查状态失败: ' + error.message);
+            }
+        }
+        
+        // 页面加载时检查登录状态
+        window.onload = function() {
+            checkLoginState();
+        };
+    </script>
+</body>
+</html>

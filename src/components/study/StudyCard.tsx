@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, ArrowRight, Check, X, Settings, User, ArrowLeft, HelpCircle } from 'lucide-react';
+import { Volume2, ArrowRight, Check, X, Settings, User, HelpCircle } from 'lucide-react';
 import { StudyCard as StudyCardType, StudyChoice } from '../../types';
 
 interface StudyCardProps {
@@ -18,6 +18,7 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
   const [userChoice, setUserChoice] = useState<StudyChoice | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // 重置状态当卡片变化时
@@ -26,9 +27,19 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
     setUserChoice(null);
     setShowHint(false);
     setIsPlayingAudio(false);
+    setAudioError(null);
+    
+    // 清理音频资源
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.removeEventListener('ended', () => {});
+      audioRef.current.removeEventListener('error', () => {});
       audioRef.current = null;
+    }
+    
+    // 清理TTS
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
     }
   }, [card]);
 
@@ -36,6 +47,7 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
     if (isPlayingAudio) return;
     
     setIsPlayingAudio(true);
+    setAudioError(null);
     
     // 优先使用真实音频文件
     if (card.originalWord?.audioUrl) {
@@ -46,13 +58,26 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
         }
         
         audioRef.current = new Audio(card.originalWord.audioUrl);
-        audioRef.current.onended = () => setIsPlayingAudio(false);
-        audioRef.current.onerror = () => {
+        
+        // 设置事件监听器
+        const handleAudioEnd = () => {
+          setIsPlayingAudio(false);
+        };
+        
+        const handleAudioError = () => {
+          console.log('音频文件加载失败，切换到TTS');
+          setAudioError('音频加载失败，使用语音合成');
           fallbackToTTS();
         };
         
+        audioRef.current.addEventListener('ended', handleAudioEnd);
+        audioRef.current.addEventListener('error', handleAudioError);
+        
         await audioRef.current.play();
+        
       } catch (error) {
+        console.log('音频播放失败，切换到TTS:', error);
+        setAudioError('音频播放失败，使用语音合成');
         fallbackToTTS();
       }
     } else {
@@ -62,15 +87,36 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
   };
 
   const fallbackToTTS = () => {
-    if (card.word) {
-      const utterance = new SpeechSynthesisUtterance(card.word);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.8;
-      utterance.onend = () => setIsPlayingAudio(false);
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    } else {
+    try {
+      if (card.word && window.speechSynthesis) {
+        const utterance = new SpeechSynthesisUtterance(card.word);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.8;
+        utterance.onend = () => {
+          setIsPlayingAudio(false);
+          if (audioError) {
+            // 3秒后清除错误提示
+            setTimeout(() => setAudioError(null), 3000);
+          }
+        };
+        utterance.onerror = () => {
+          setIsPlayingAudio(false);
+          setAudioError('语音合成失败');
+          setTimeout(() => setAudioError(null), 3000);
+        };
+        
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      } else {
+        setIsPlayingAudio(false);
+        setAudioError('语音功能不可用');
+        setTimeout(() => setAudioError(null), 3000);
+      }
+    } catch (error) {
+      console.error('TTS播放失败:', error);
       setIsPlayingAudio(false);
+      setAudioError('语音播放失败');
+      setTimeout(() => setAudioError(null), 3000);
     }
   };
 
@@ -130,102 +176,121 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
   };
 
   return (
-    <div className="bg-zinc-900 text-white font-geist overflow-hidden">
-      {/* Hero Section */}
-      <div className="min-h-screen flex flex-col relative pt-6 pr-6 pb-6 pl-6 items-center justify-center">
-        {/* Background Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-zinc-900 to-zinc-900"></div>
+    <div className="text-white relative min-h-screen animate-blur-in animate-delay-200 bg-gradient-to-br from-gray-900 via-purple-900/20 to-blue-900/20">
+      {/* Dynamic Background Decorations - Responsive */}
+      <div className="absolute top-20 left-4 sm:left-10 w-20 h-20 sm:w-32 sm:h-32 bg-purple-500/10 rounded-full blur-xl animate-pulse"></div>
+      <div className="absolute bottom-32 right-4 sm:right-8 w-16 h-16 sm:w-24 sm:h-24 bg-blue-500/10 rounded-full blur-lg animate-pulse" style={{animationDelay: '1s'}}></div>
+      <div className="absolute top-1/3 right-12 sm:right-20 w-12 h-12 sm:w-16 sm:h-16 bg-pink-500/10 rounded-full blur-md animate-pulse" style={{animationDelay: '2s'}}></div>
+      
+      {/* Main Container - Mobile Optimized */}
+      <div className="min-h-screen flex flex-col relative p-3 sm:p-6 items-center justify-start sm:justify-center z-10 space-y-3 sm:space-y-6 pt-4 sm:pt-0">
         
-        {/* Header */}
-        <div className="absolute top-0 left-0 right-0 flex z-10 opacity-90 animate-fade-in pt-6 pr-6 pb-6 pl-6 items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <button 
-              onClick={onBack}
-              className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-800 hover:bg-zinc-700 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-zinc-400" />
-            </button>
-            <h1 className="text-xl font-medium">Lexicon</h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <button className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-800 hover:bg-zinc-700 transition-colors">
-              <Settings className="w-5 h-5 text-zinc-400" />
-            </button>
-            <button className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-800 hover:bg-zinc-700 transition-colors">
-              <User className="w-5 h-5 text-zinc-400" />
-            </button>
+
+
+        {/* Enhanced Progress Bar - Compressed */}
+        <div className="w-full max-w-md animate-blur-in animate-delay-300">
+          <div className="glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-glow relative overflow-hidden">
+            {/* Decorative gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-2xl"></div>
+            <div className="relative">
+              <div className="flex justify-between items-center mb-2 sm:mb-4">
+                <span className="text-xs sm:text-sm font-semibold text-purple-300 uppercase tracking-wide">学习进度</span>
+                <span className="text-xs sm:text-sm font-bold text-white bg-white/10 px-2 py-1 sm:px-3 rounded-full">{current + 1}/{total}</span>
+              </div>
+              <div className="study-progress-bar mb-1 sm:mb-2">
+                <div 
+                  className="study-progress-fill shadow-glow" 
+                  style={{ width: `${((current + 1) / total) * 100}%` }}
+                ></div>
+              </div>
+              <div className="text-xs text-white/60 text-center">
+                {Math.round(((current + 1) / total) * 100)}% 完成
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="absolute top-20 left-6 right-6 opacity-90 animate-fade-in">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-zinc-400">Progress</span>
-            <span className="text-sm text-zinc-400">{current + 1}/{total}</span>
-          </div>
-          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-indigo-500 rounded-full transition-all duration-500" 
-              style={{ width: `${((current + 1) / total) * 100}%` }}
-            ></div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex flex-col z-10 w-full max-w-sm space-y-8 items-center">
-          {/* Flashcard */}
-          <div className="flashcard-container relative w-full h-80 opacity-100 animate-fade-in">
-            <div className={`flashcard w-full h-full relative transition-transform duration-500 ${
+        {/* Main Content - Mobile Optimized */}
+        <div className="flex flex-col w-full max-w-md space-y-4 sm:space-y-6 items-center flex-1 justify-center animate-blur-in animate-delay-400">
+          {/* Enhanced Flashcard - Mobile Height */}
+          <div className="w-full h-64 sm:h-80 md:h-96 perspective-container">
+            <div className={`flashcard w-full h-full relative transition-all duration-700 ease-in-out ${
               answerRevealed ? 'flipped' : ''
             }`} style={{ transformStyle: 'preserve-3d' }}>
               
-              {/* Front Side */}
-              <div className="flashcard-front absolute inset-0 flex bg-zinc-800/80 border-zinc-800 border rounded-3xl shadow-md backdrop-blur-sm items-center justify-center" style={{ backfaceVisibility: 'hidden' }}>
-                <div className="text-center p-8 w-full">
-                  <h2 className="text-5xl font-medium text-white mb-4 tracking-tight">{card.word}</h2>
-                  <div className="w-12 h-0.5 bg-indigo-500 mx-auto mb-4"></div>
+              {/* Enhanced Front Side */}
+              <div className="flashcard-front absolute inset-0 flex glass-card-strong rounded-3xl border-2 border-white/30 items-center justify-center shadow-glow-blue" style={{ backfaceVisibility: 'hidden' }}>
+                {/* Decorative elements */}
+                <div className="absolute top-4 left-4 w-3 h-3 bg-purple-400/50 rounded-full animate-pulse"></div>
+                <div className="absolute top-4 right-4 w-2 h-2 bg-blue-400/50 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
+                <div className="absolute bottom-4 left-4 w-2 h-2 bg-pink-400/50 rounded-full animate-pulse" style={{animationDelay: '1s'}}></div>
+                
+                <div className="text-center p-4 sm:p-6 md:p-8 w-full relative">
+                  <div className="mb-3 sm:mb-4">
+                    <div className="text-xs sm:text-sm text-purple-300 font-medium uppercase tracking-wider mb-1 sm:mb-2">VOCABULARY</div>
+                    <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-2 sm:mb-4 tracking-tight bg-gradient-to-r from-purple-300 to-blue-300 bg-clip-text text-transparent leading-tight">{card.word}</h2>
+                  </div>
+                  <div className="w-16 sm:w-20 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 mx-auto mb-4 sm:mb-6 rounded-full shadow-glow"></div>
                   <button 
                     onClick={handlePlayAudio}
                     disabled={isPlayingAudio}
                     aria-label="Play pronunciation" 
-                    className={`mt-2 inline-flex items-center justify-center w-12 h-12 rounded-full transition-colors shadow-md mx-auto ${
+                    className={`inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl transition-all duration-300 mx-auto hover:scale-110 active:scale-95 btn-enhanced modern-focus ${
                       isPlayingAudio 
-                        ? 'bg-indigo-600' 
-                        : 'bg-indigo-500 hover:bg-indigo-600'
+                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-glow' 
+                        : 'glass-card hover:glass-card-strong text-white border border-white/30'
                     }`}
                   >
-                    <Volume2 className="w-6 h-6 text-white" />
+                    <Volume2 className="w-5 h-5 sm:w-7 sm:h-7" />
                   </button>
                   
-                  {/* 提示内容 */}
+                  {/* Enhanced Hint Content - Mobile Compressed */}
                   {showHint && card.meanings?.[0]?.example && (
-                    <div className="mt-6 bg-zinc-900/50 rounded-2xl p-4 border border-zinc-700">
-                      <p className="text-sm text-yellow-400 mb-2">💡 提示</p>
-                      <p className="text-sm text-zinc-300 italic">"{card.meanings[0].example}"</p>
+                    <div className="mt-4 sm:mt-6 glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-yellow-500/40 relative overflow-hidden animate-blur-in">
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl sm:rounded-2xl"></div>
+                      <div className="relative">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 bg-yellow-400/30 rounded-lg flex items-center justify-center">
+                            <span className="text-yellow-300 text-xs sm:text-sm">💡</span>
+                          </div>
+                          <p className="text-xs sm:text-sm text-yellow-300 font-semibold uppercase tracking-wide">提示</p>
+                        </div>
+                        <p className="text-sm sm:text-base text-yellow-100 italic font-medium">"{card.meanings[0].example}"</p>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Back Side */}
-              <div className="flashcard-back absolute inset-0 bg-zinc-800/80 backdrop-blur-sm border border-zinc-800 rounded-3xl p-8 shadow-md" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                <div className="h-full flex flex-col justify-center">
-                  <div className="mb-6">
-                    <div className="flex items-center space-x-2 mb-3">
+              {/* Enhanced Back Side */}
+              <div className="flashcard-back absolute inset-0 glass-card-strong rounded-3xl border-2 border-white/30 p-6 sm:p-8 shadow-glow" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                {/* Decorative elements */}
+                <div className="absolute top-4 right-4 w-3 h-3 bg-green-400/50 rounded-full animate-pulse"></div>
+                <div className="absolute bottom-4 left-4 w-2 h-2 bg-yellow-400/50 rounded-full animate-pulse" style={{animationDelay: '0.7s'}}></div>
+                
+                <div className="h-full flex flex-col justify-center relative">
+                  <div className="mb-4 sm:mb-6">
+                    <div className="flex items-center space-x-2 mb-3 sm:mb-4">
+                      <div className="text-xs sm:text-sm text-blue-300 font-medium uppercase tracking-wider">DEFINITION</div>
                       {card.meanings?.[0]?.partOfSpeech && (
-                        <span className="text-xs text-indigo-400 bg-indigo-500/20 px-2 py-1 rounded-full">
+                        <span className="text-xs font-semibold text-purple-200 bg-gradient-to-r from-purple-500/30 to-blue-500/30 px-2 py-1 sm:px-3 sm:py-1 rounded-full border border-purple-400/40 shadow-glow">
                           {card.meanings[0].partOfSpeech}
                         </span>
                       )}
                     </div>
-                    <h3 className="text-2xl font-medium text-white mb-2">{card.meanings?.[0]?.definition || '释义暂无'}</h3>
-                    <p className="text-sm text-zinc-400">The meaning of this word in English</p>
+                    <h3 className="text-base sm:text-xl md:text-2xl font-bold text-white mb-2 sm:mb-3 leading-relaxed">{card.meanings?.[0]?.definition || '释义暂无'}</h3>
+                    <div className="w-10 sm:w-12 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full mb-2 sm:mb-3"></div>
+                    <p className="text-xs sm:text-sm text-blue-200/80 font-medium">English Definition</p>
                   </div>
                   
                   {card.meanings?.[0]?.example && (
-                    <div className="bg-zinc-900/50 rounded-2xl p-4 border border-zinc-800">
-                      <p className="text-sm text-zinc-300 mb-2">"{card.meanings[0].example}"</p>
-                      <p className="text-sm text-zinc-500">"例句的中文翻译。"</p>
+                    <div className="glass-card rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/20 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-blue-500/5"></div>
+                      <div className="relative">
+                        <div className="text-xs text-green-300 font-medium uppercase tracking-wide mb-2">EXAMPLE</div>
+                        <p className="text-sm sm:text-base text-white mb-2 font-medium italic">"{card.meanings[0].example}"</p>
+                        <p className="text-xs sm:text-sm text-green-200/70">"例句的中文翻译。"</p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -233,93 +298,106 @@ export function StudyCard({ card, showAnswer, onShowAnswer, onChoice, scheduler,
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className={`flex flex-col space-y-3 w-full opacity-100 animate-fade-in ${answerRevealed ? 'hidden' : ''}`}>
+          {/* Enhanced Action Buttons - Compressed */}
+          <div className={`flex flex-col space-y-3 sm:space-y-4 w-full animate-blur-in animate-delay-500 ${answerRevealed ? 'hidden' : ''}`}>
             {!showHint ? (
               <>
-                {/* 初始三选项 */}
                 <button 
                   onClick={handleKnow}
-                  className="know-btn w-full hover:bg-green-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-green-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                  className="w-full study-button-green hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-xl sm:rounded-2xl p-3 sm:p-4 space-x-3 items-center justify-center btn-enhanced modern-focus shadow-glow group"
                 >
-                  <Check className="w-5 h-5" />
-                  <span>认识</span>
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 bg-green-400/30 rounded-lg flex items-center justify-center group-hover:bg-green-400/50 transition-colors">
+                    <Check className="w-4 h-4 text-green-300" />
+                  </div>
+                  <span className="text-sm sm:text-base">认识</span>
                 </button>
                 
                 <button 
                   onClick={handleHint}
-                  className="hint-btn w-full hover:bg-yellow-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-yellow-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                  className="w-full study-button-yellow hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-5 space-x-4 items-center justify-center btn-enhanced modern-focus group"
                 >
-                  <HelpCircle className="w-5 h-5" />
-                  <span>提示</span>
+                  <div className="w-8 h-8 bg-yellow-400/30 rounded-xl flex items-center justify-center group-hover:bg-yellow-400/50 transition-colors">
+                    <HelpCircle className="w-5 h-5 text-yellow-300" />
+                  </div>
+                  <span className="text-lg">提示</span>
                 </button>
                 
                 <button 
                   onClick={handleDontKnow}
-                  className="dont-know-btn w-full hover:bg-red-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-red-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                  className="w-full study-button-red hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-5 space-x-4 items-center justify-center btn-enhanced modern-focus group"
                 >
-                  <X className="w-5 h-5" />
-                  <span>不认识</span>
+                  <div className="w-8 h-8 bg-red-400/30 rounded-xl flex items-center justify-center group-hover:bg-red-400/50 transition-colors">
+                    <X className="w-5 h-5 text-red-300" />
+                  </div>
+                  <span className="text-lg">不认识</span>
                 </button>
               </>
             ) : (
               <>
-                {/* 提示后的选项 */}
-                <div className="text-center text-sm text-yellow-400 mb-2">
-                  看完提示后，你现在认识这个单词吗？
+                <div className="text-center glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-yellow-500/40 relative overflow-hidden mb-2">
+                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-orange-500/10"></div>
+                  <div className="relative">
+                    <div className="text-xs text-yellow-300 font-semibold uppercase tracking-wide mb-1 sm:mb-2">提示已显示</div>
+                    <p className="text-xs sm:text-sm text-yellow-100 font-medium">看完提示后，你现在认识这个单词吗？</p>
+                  </div>
                 </div>
                 <button 
                   onClick={handleKnowAfterHint}
-                  className="know-after-hint-btn w-full hover:bg-yellow-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-yellow-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                  className="w-full study-button-yellow hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-5 space-x-4 items-center justify-center btn-enhanced modern-focus group"
                 >
-                  <Check className="w-5 h-5" />
-                  <span>现在认识了</span>
+                  <div className="w-8 h-8 bg-yellow-400/30 rounded-xl flex items-center justify-center group-hover:bg-yellow-400/50 transition-colors">
+                    <Check className="w-5 h-5 text-yellow-300" />
+                  </div>
+                  <span className="text-lg">现在认识了</span>
                 </button>
                 
                 <button 
                   onClick={handleDontKnow}
-                  className="still-dont-know-btn w-full hover:bg-red-600 transition-all duration-200 flex active:scale-95 font-medium text-white bg-red-500 rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center"
+                  className="w-full study-button-red hover:scale-105 active:scale-95 transition-all duration-300 flex font-semibold text-white rounded-2xl p-5 space-x-4 items-center justify-center btn-enhanced modern-focus group"
                 >
-                  <X className="w-5 h-5" />
-                  <span>仍然不认识</span>
+                  <div className="w-8 h-8 bg-red-400/30 rounded-xl flex items-center justify-center group-hover:bg-red-400/50 transition-colors">
+                    <X className="w-5 h-5 text-red-300" />
+                  </div>
+                  <span className="text-lg">仍然不认识</span>
                 </button>
               </>
             )}
           </div>
 
-          {/* Next Button */}
+          {/* Enhanced Next Button - Compressed */}
           <button 
             onClick={handleNext}
-            className={`next-btn w-full hover:bg-zinc-700 transition-all duration-200 flex active:scale-95 font-medium text-white bg-zinc-800 border-zinc-800 border rounded-2xl pt-4 pr-6 pb-4 pl-6 shadow-md space-x-3 items-center justify-center ${
+            className={`w-full gradient-primary hover:scale-105 active:scale-95 transition-all duration-300 flex font-bold text-white rounded-xl sm:rounded-2xl p-4 sm:p-5 space-x-3 items-center justify-center btn-enhanced modern-focus shadow-glow group animate-blur-in animate-delay-600 ${
               !answerRevealed ? 'hidden' : ''
             }`}
           >
-            <span>Next Word</span>
-            <ArrowRight className="w-5 h-5" />
+            <span className="text-sm sm:text-base">下一个单词</span>
+            <div className="w-6 h-6 sm:w-7 sm:h-7 bg-white/20 rounded-lg flex items-center justify-center group-hover:bg-white/30 transition-colors">
+              <ArrowRight className="w-4 h-4" />
+            </div>
           </button>
         </div>
 
-        {/* Stats Footer */}
-        <div className="absolute bottom-6 left-6 right-6 opacity-90 animate-fade-in">
-          <div className="bg-zinc-800/50 backdrop-blur-sm border border-zinc-800 rounded-2xl p-4">
-            <div className="flex justify-between items-center">
-              <div className="text-center">
-                <div className="text-xl font-medium text-green-400">
-                  {Math.floor(((current + 1) / total) * 100 * 0.6)}
+        {/* Enhanced Stats Footer - Compressed */}
+        <div className="w-full max-w-md animate-blur-in animate-delay-600">
+          <div className="glass-card-strong rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-glow relative overflow-hidden">
+            {/* Decorative gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 via-yellow-500/5 to-blue-500/5 rounded-xl sm:rounded-2xl"></div>
+            <div className="relative">
+              <div className="text-xs text-white/60 font-semibold uppercase tracking-wide mb-2 sm:mb-3 text-center">学习统计</div>
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="text-center p-2 sm:p-3 glass-card rounded-lg sm:rounded-xl border border-green-500/30">
+                  <div className="text-lg sm:text-xl font-bold text-green-400 mb-0.5">1</div>
+                  <div className="text-xs text-green-300 font-medium">已掌握</div>
                 </div>
-                <div className="text-xs text-zinc-500">Known</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl font-medium text-red-400">
-                  {Math.floor(((current + 1) / total) * 100 * 0.4)}
+                <div className="text-center p-2 sm:p-3 glass-card rounded-lg sm:rounded-xl border border-yellow-500/30">
+                  <div className="text-lg sm:text-xl font-bold text-yellow-400 mb-0.5">0</div>
+                  <div className="text-xs text-yellow-300 font-medium">学习中</div>
                 </div>
-                <div className="text-xs text-zinc-500">Learning</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl font-medium text-zinc-400">
-                  {total - current - 1}
+                <div className="text-center p-2 sm:p-3 glass-card rounded-lg sm:rounded-xl border border-blue-500/30">
+                  <div className="text-lg sm:text-xl font-bold text-blue-400 mb-0.5">{total - current - 1}</div>
+                  <div className="text-xs text-blue-300 font-medium">剩余</div>
                 </div>
-                <div className="text-xs text-zinc-500">Remaining</div>
               </div>
             </div>
           </div>

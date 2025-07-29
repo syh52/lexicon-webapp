@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '../components/ui';
 import { Eye, EyeOff, ArrowLeft, User, Mail, Lock } from 'lucide-react';
+import { BACKGROUNDS, GRADIENTS, BORDERS, TEXT_COLORS } from '../constants/design';
 
 type AuthMode = 'login' | 'register';
 
@@ -321,9 +322,12 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex flex-col">
+    <div className={`${BACKGROUNDS.FULLSCREEN} flex flex-col relative`}>
+      {/* Subtle decorative overlay */}
+      <div className={`absolute inset-0 ${GRADIENTS.SUBTLE} pointer-events-none`}></div>
+      
       {/* Mobile Container */}
-      <div className="max-w-md mx-auto w-full min-h-screen bg-gray-900 relative overflow-hidden">
+      <div className="max-w-md mx-auto w-full min-h-screen relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-6 pt-12">
           <button 

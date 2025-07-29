@@ -11,7 +11,17 @@ export default function MobileHeader() {
   const isHomePage = pathname === '/';
 
   const handleBack = () => {
-    navigate('/');
+    // 智能返回逻辑
+    if (pathname.startsWith('/study/')) {
+      // 从学习页面返回到词汇书列表
+      navigate('/wordbooks', { replace: true });
+    } else if (pathname.startsWith('/wordbooks/')) {
+      // 从词汇书详情返回到词汇书列表
+      navigate('/wordbooks');
+    } else {
+      // 默认返回首页
+      navigate('/');
+    }
   };
 
   return (

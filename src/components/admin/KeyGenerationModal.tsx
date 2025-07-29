@@ -43,7 +43,7 @@ export const KeyGenerationModal: React.FC<KeyGenerationModalProps> = ({
       setMessageType('');
       
       await ensureLogin();
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'admin-management',

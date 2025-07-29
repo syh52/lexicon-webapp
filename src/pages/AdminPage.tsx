@@ -27,6 +27,7 @@ import {
   CheckCircle,
   AlertTriangle
 } from 'lucide-react';
+import { BACKGROUNDS, TEXT_COLORS } from '../constants/design';
 
 interface AdminKey {
   keyId: string;
@@ -102,7 +103,7 @@ const AdminPage: React.FC = () => {
     try {
       setLoading(true);
       await ensureLogin();
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'admin-management',
@@ -126,7 +127,7 @@ const AdminPage: React.FC = () => {
   const loadKeyStats = async () => {
     try {
       await ensureLogin();
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'admin-management',
@@ -149,7 +150,7 @@ const AdminPage: React.FC = () => {
     try {
       setLoading(true);
       await ensureLogin();
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'userInfo',
@@ -174,7 +175,7 @@ const AdminPage: React.FC = () => {
     try {
       setMigrationLoading(true);
       await ensureLogin();
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'user-data-migration',
@@ -202,7 +203,7 @@ const AdminPage: React.FC = () => {
     try {
       setMigrationLoading(true);
       await ensureLogin();
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'user-data-migration',
@@ -237,7 +238,7 @@ const AdminPage: React.FC = () => {
     try {
       setLoading(true);
       await ensureLogin();
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'admin-management',
@@ -271,7 +272,7 @@ const AdminPage: React.FC = () => {
     
     try {
       await ensureLogin();
-      const app = getApp();
+      const app = await getApp();
       
       const result = await app.callFunction({
         name: 'admin-management',
@@ -591,7 +592,7 @@ const AdminPage: React.FC = () => {
   // 如果用户不是管理员，只显示权限提升页面
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gray-900 py-12">
+      <div className="min-h-screen py-12">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-12">
             <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -613,7 +614,7 @@ const AdminPage: React.FC = () => {
 
   // 管理员用户显示完整的管理面板
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen">
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="mb-12">
           <div className="flex items-center space-x-4 mb-4">

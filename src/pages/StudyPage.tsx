@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { StudyCard } from '../components/study/StudyCard';
@@ -8,8 +8,9 @@ import wordbookService, { Word, StudyRecord } from '../services/wordbookService'
 import { SM2Service, createStudySession } from '../services/sm2Service';
 import { DailyStudySession } from '../utils/sm2Algorithm';
 import { StudyChoice, SM2Card } from '../types';
-import { app, ensureLogin } from '../utils/cloudbase';
+import { getApp, ensureLogin } from '../utils/cloudbase';
 import { studySessionService, StudySessionState } from '../services/studySessionService';
+import { BACKGROUNDS, TEXT_COLORS } from '../constants/design';
 
 interface StudySession {
   plan: DailyStudyPlan;
@@ -27,22 +28,109 @@ export default function StudyPage() {
   
   const [session, setSession] = useState<StudySession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [sm2Service] = useState(() => new SM2Service());
   const [backgroundSaveQueue, setBackgroundSaveQueue] = useState<Array<{wordId: string, choice: StudyChoice, timestamp: number}>>([]);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  
+  // 🔥 按需加载状态
+  const [additionalWordsCache, setAdditionalWordsCache] = useState<Map<string, any>>(new Map());
+  const [isLoadingMoreWords, setIsLoadingMoreWords] = useState(false);
+  
+  // 使用ref避免user对象引用变化导致重复初始化
+  const initializationRef = useRef<{
+    userId: string | null;
+    wordbookId: string | null;
+    initialized: boolean;
+    lastInitTime: number;
+  }>({
+    userId: null,
+    wordbookId: null,
+    initialized: false,
+    lastInitTime: 0
+  });
 
-  useEffect(() => {
-    // 由于已经被RequireAuth保护，user和wordbookId在这里一定存在
-    if (wordbookId && user) {
-      initializeStudySession();
+  // 稳定的用户ID，避免对象引用变化
+  const stableUserId = useMemo(() => user?.uid || null, [user?.uid]);
+  
+  // 🔥 按需加载更多单词的函数
+  const loadMoreWords = useCallback(async (wordIds: string[]): Promise<Map<string, any>> => {
+    if (isLoadingMoreWords || !wordbookId) return new Map();
+    
+    // 检查哪些单词还没有缓存
+    const missingWordIds = wordIds.filter(id => !additionalWordsCache.has(id));
+    if (missingWordIds.length === 0) {
+      return additionalWordsCache;
     }
-  }, [wordbookId, user]);
-
-  const initializeStudySession = async () => {
+    
     try {
+      setIsLoadingMoreWords(true);
+      console.log(`🔄 按需加载 ${missingWordIds.length} 个单词...`);
+      
+      const appInstance = await getApp();
+      const wordsResult = await appInstance.callFunction({
+        name: 'getWordsByWordbook',
+        data: { wordbookId, limit: 50, offset: additionalWordsCache.size + 20 }
+      });
+      
+      if (wordsResult.result?.success && wordsResult.result?.data) {
+        const newWords = wordsResult.result.data;
+        const newWordsMap = new Map(additionalWordsCache);
+        
+        newWords.forEach((word: any) => {
+          newWordsMap.set(word._id, word);
+        });
+        
+        setAdditionalWordsCache(newWordsMap);
+        console.log(`✅ 成功加载 ${newWords.length} 个单词到缓存`);
+        return newWordsMap;
+      }
+    } catch (error) {
+      console.error('按需加载单词失败:', error);
+    } finally {
+      setIsLoadingMoreWords(false);
+    }
+    
+    return additionalWordsCache;
+  }, [additionalWordsCache, isLoadingMoreWords, wordbookId]);
+  
+  const initializeStudySession = useCallback(async () => {
+    const now = Date.now();
+    const currentInit = initializationRef.current;
+    
+    // 🔒 增强防抖机制 - 防止频繁调用
+    if (isInitializing) {
+      console.log('⏸️ 学习会话正在初始化中，跳过重复请求');
+      return;
+    }
+    
+    // 🔒 时间防抖：300ms内的重复调用直接忽略
+    if (now - currentInit.lastInitTime < 300) {
+      console.log('⏸️ 频繁调用防抖，跳过请求');
+      return;
+    }
+    
+    // 🔒 参数一致性检查
+    if (currentInit.initialized && 
+        currentInit.userId === stableUserId && 
+        currentInit.wordbookId === wordbookId) {
+      console.log('⏸️ 相同参数已初始化，跳过重复请求');
+      return;
+    }
+    
+    try {
+      setIsInitializing(true);
       setIsLoading(true);
       
-      // RequireAuth已确保用户已登录，这里只需检查wordbookId
+      // 更新初始化状态
+      initializationRef.current = {
+        userId: stableUserId,
+        wordbookId: wordbookId || null,
+        initialized: false,
+        lastInitTime: now
+      };
+      
+      // 基础检查
       if (!wordbookId) {
         console.error('缺少词书ID');
         navigate('/wordbooks');
@@ -50,13 +138,17 @@ export default function StudyPage() {
       }
       
       const startTime = Date.now();
+      console.log('🚀 开始并行加载学习数据...');
       
-      // 🔄 优先尝试恢复学习进度
-      console.log('🔍 正在检查已保存的学习进度...');
-      const savedSessionState = await studySessionService.loadStudyProgress(user.uid, wordbookId);
-      
-      // 获取或创建今日学习计划（保持兼容性）
-      const todayPlan = await dailyPlanService.getTodayStudyPlan(user.uid, wordbookId);
+      // 🔥 关键优化：并行执行独立的异步操作
+      const [savedSessionState, todayPlan, appInstance] = await Promise.all([
+        // 组1：检查已保存的学习进度
+        studySessionService.loadStudyProgress(user.uid, wordbookId),
+        // 组2：获取今日学习计划
+        dailyPlanService.getTodayStudyPlan(user.uid, wordbookId),
+        // 组3：确保CloudBase连接 + 获取app实例
+        ensureLogin().then(() => getApp())
+      ]);
       
       if (!todayPlan) {
         console.error('无法获取今日学习计划');
@@ -65,13 +157,10 @@ export default function StudyPage() {
         return;
       }
       
-      // 确保用户已登录CloudBase
-      await ensureLogin();
-      
-      // 获取所有单词数据用于显示
-      const wordsResult = await app.callFunction({
+      // 🔥 优化：只获取前20个单词用于快速启动
+      const wordsResult = await appInstance.callFunction({
         name: 'getWordsByWordbook',
-        data: { wordbookId, limit: 1000 }
+        data: { wordbookId, limit: 20, offset: 0 }
       });
       
       if (!wordsResult.result?.success || !wordsResult.result?.data) {
@@ -83,8 +172,9 @@ export default function StudyPage() {
       
       const words = wordsResult.result.data;
       
-      // 创建单词查找映射
-      const wordsMap = new Map(words.map((word: any) => [word._id, word]));
+      // 🔥 创建单词查找映射（合并初始加载和缓存）
+      const initialWordsMap = new Map(words.map((word: any) => [word._id, word]));
+      const combinedWordsMap = new Map([...initialWordsMap, ...additionalWordsCache]);
       
       // 创建SM-2每日学习会话
       let sm2Session = await createStudySession(user.uid, wordbookId, todayPlan.totalCount);
@@ -134,12 +224,20 @@ export default function StudyPage() {
         console.log('🆕 创建新的学习会话');
       }
       
-      // 获取当前要学习的卡片
+      // 🔥 获取当前要学习的卡片（支持按需加载）
       const currentSM2Card = sm2Session.getCurrentCard();
       let currentCard = null;
       
       if (currentSM2Card) {
-        const originalWord = wordsMap.get(currentSM2Card.wordId);
+        let originalWord = combinedWordsMap.get(currentSM2Card.wordId);
+        
+        // 如果当前卡片的单词不在缓存中，尝试按需加载
+        if (!originalWord) {
+          console.log(`🔄 当前单词 ${currentSM2Card.wordId} 不在缓存中，按需加载...`);
+          const updatedWordsMap = await loadMoreWords([currentSM2Card.wordId]);
+          originalWord = updatedWordsMap.get(currentSM2Card.wordId);
+        }
+        
         if (originalWord) {
           currentCard = {
             _id: currentSM2Card.wordId,
@@ -160,7 +258,7 @@ export default function StudyPage() {
         plan: todayPlan,
         sm2Session,
         currentCard,
-        wordsMap,
+        wordsMap: combinedWordsMap,
         isCompleted: sm2Session.isCompleted(),
         sessionState // 保存会话状态
       };
@@ -174,13 +272,17 @@ export default function StudyPage() {
         await studySessionService.clearAllProgress(user.uid, wordbookId);
       }
       
-      console.log('✅ 学习会话初始化成功');
+      // 标记初始化成功
+      initializationRef.current.initialized = true;
+      console.log(`✅ 学习会话初始化成功 (耗时: ${totalTime}ms)`);
       
     } catch (error) {
       console.error('初始化学习会话失败:', error);
       
+      // 重置初始化状态以允许重试
+      initializationRef.current.initialized = false;
+      
       // 只有在完全没有可用session时才显示错误
-      // 如果有部分功能可用，不显示错误消息
       const hasPartialFunction = session?.currentCard || session?.sm2Session;
       if (!hasPartialFunction) {
         setMessage({ type: 'error', text: '初始化学习会话失败' });
@@ -189,8 +291,16 @@ export default function StudyPage() {
       }
     } finally {
       setIsLoading(false);
+      setIsInitializing(false);
     }
-  };
+  }, [stableUserId, wordbookId, navigate]); // 移除session依赖避免循环
+
+  // 使用useEffect触发初始化，优化依赖项
+  useEffect(() => {
+    if (stableUserId && wordbookId) {
+      initializeStudySession();
+    }
+  }, [stableUserId, wordbookId, initializeStudySession]);
 
   const handleChoice = async (choice: StudyChoice) => {
     if (!session?.currentCard || !user || !session.sm2Session || !session.sessionState) return;
@@ -213,12 +323,25 @@ export default function StudyPage() {
       await studySessionService.saveStudyProgress(updatedSessionState);
       console.log(`💾 进度已保存: ${updatedSessionState.completedCards}/${updatedSessionState.totalCards}`);
       
-      // 4. 获取下一张卡片
+      // 4. 🔥 获取下一张卡片（支持按需加载）
       const nextSM2Card = session.sm2Session.getCurrentCard();
       let nextCard = null;
       
       if (nextSM2Card) {
-        const originalWord = session.wordsMap.get(nextSM2Card.wordId);
+        let originalWord = session.wordsMap.get(nextSM2Card.wordId);
+        
+        // 如果下一张卡片的单词不在缓存中，尝试按需加载
+        if (!originalWord) {
+          console.log(`🔄 下一张卡片单词 ${nextSM2Card.wordId} 不在缓存中，按需加载...`);
+          const updatedWordsMap = await loadMoreWords([nextSM2Card.wordId]);
+          originalWord = updatedWordsMap.get(nextSM2Card.wordId);
+          
+          // 同时更新session中的wordsMap
+          if (originalWord) {
+            session.wordsMap.set(nextSM2Card.wordId, originalWord);
+          }
+        }
+        
         if (originalWord) {
           nextCard = {
             _id: nextSM2Card.wordId,
@@ -351,13 +474,16 @@ export default function StudyPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center space-y-4">
           <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xl text-white">准备学习材料...</span>
-          <div className="text-sm text-gray-400 text-center">
-            <p>正在加载今日学习计划</p>
-            <p>检查并恢复学习进度</p>
+          <span className={`text-xl ${TEXT_COLORS.PRIMARY}`}>准备学习材料...</span>
+          <div className={`text-sm ${TEXT_COLORS.MUTED} text-center space-y-1`}>
+            <p>🔄 并行加载学习数据</p>
+            <p>📚 优化加载性能中</p>
+            <div className="w-48 h-1 bg-gray-700 rounded-full overflow-hidden mt-3">
+              <div className="h-full bg-gradient-to-r from-purple-500 to-blue-500 animate-pulse"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -366,9 +492,9 @@ export default function StudyPage() {
 
   if (!session) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-xl mb-4">无法加载学习会话</p>
+          <p className={`text-xl mb-4 ${TEXT_COLORS.PRIMARY}`}>无法加载学习会话</p>
           <button 
             onClick={handleBackToWordbooks}
             className="px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 transition"
@@ -382,19 +508,19 @@ export default function StudyPage() {
 
   if (session.isCompleted) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen text-center space-y-6 px-6 bg-gray-900 text-white">
+      <div className={`flex flex-col items-center justify-center h-screen text-center space-y-6 px-6 ${TEXT_COLORS.PRIMARY}`}>
         <div className="text-6xl mb-4">🎉</div>
         <h2 className="text-3xl font-semibold tracking-tight">恭喜完成！</h2>
         <div className="text-lg text-gray-400 space-y-2">
           <p>今日学习目标已达成</p>
           <div className="bg-gray-800 rounded-lg p-4 space-y-2">
             <p>
-              认识：<span className="text-green-400">{session.plan.stats.knownCount || 0}</span> 个　　
-              提示：<span className="text-yellow-400">{session.plan.stats.hintCount || 0}</span> 个　　
-              不认识：<span className="text-red-400">{session.plan.stats.unknownCount || 0}</span> 个
+              认识：<span className="text-green-400">{session.sm2Session?.getSessionStats().choiceStats.know || 0}</span> 个　　
+              提示：<span className="text-yellow-400">{session.sm2Session?.getSessionStats().choiceStats.hint || 0}</span> 个　　
+              不认识：<span className="text-red-400">{session.sm2Session?.getSessionStats().choiceStats.unknown || 0}</span> 个
             </p>
             <p>
-              准确率：<span className="text-purple-400">{Math.round(session.plan.stats.accuracy || 0)}%</span>
+              准确率：<span className="text-purple-400">{Math.round(session.sm2Session?.getSessionStats().choiceStats.know / Math.max(1, session.sm2Session?.getSessionStats().total || 1) * 100 || 0)}%</span>
             </p>
             <p className="text-sm text-gray-500">
               共学习：{session.sm2Session?.getSessionStats().total || session.plan.totalCount} 个单词
@@ -453,6 +579,13 @@ export default function StudyPage() {
       {backgroundSaveQueue.length > 0 && process.env.NODE_ENV === 'development' && (
         <div className="fixed bottom-4 right-4 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg text-xs">
           后台保存: {backgroundSaveQueue.length}
+        </div>
+      )}
+      
+      {/* 🔥 按需加载状态指示 */}
+      {isLoadingMoreWords && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-40 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm">
+          🔄 智能加载单词中...
         </div>
       )}
     </>

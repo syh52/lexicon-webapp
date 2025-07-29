@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试认证刷新问题</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        .success {
+            background-color: #d4edda;
+            border-left-color: #28a745;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        #output {
+            background-color: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            line-height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Lexicon Web App - 认证刷新测试工具</h1>
+        
+        <div class="section warning">
+            <h2>⚠️ 测试前准备</h2>
+            <p>1. 确保应用正在运行于 <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></p>
+            <p>2. 准备测试账号：beelzebub1949@gmail.com / 65696788</p>
+            <p>3. 打开浏览器开发者工具（F12）查看控制台日志</p>
+        </div>
+
+        <div class="section">
+            <h2>📋 测试步骤</h2>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                <strong>检查CloudBase存储状态</strong>
+                <button onclick="checkStorage()">检查存储</button>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                <strong>分析认证相关的localStorage键</strong>
+                <button onclick="analyzeAuthKeys()">分析认证键</button>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                <strong>监控刷新前后的状态变化</strong>
+                <button onclick="startMonitoring()">开始监控</button>
+                <button onclick="compareAfterRefresh()">刷新后对比</button>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                <strong>清除测试数据</strong>
+                <button onclick="clearTestData()">清除认证数据</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>💻 输出结果</h2>
+            <div id="output">等待执行测试...</div>
+        </div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        let beforeRefreshState = {};
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            output.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function checkStorage() {
+            log('=== 检查localStorage存储状态 ===');
+            const allKeys = Object.keys(localStorage);
+            log(`总共有 ${allKeys.length} 个localStorage键`);
+            
+            const relevantKeys = allKeys.filter(key => 
+                key.includes('cloudbase') || 
+                key.includes('tcb') || 
+                key.includes('auth') ||
+                key.includes('lexicon')
+            );
+            
+            log(`找到 ${relevantKeys.length} 个相关键：`);
+            relevantKeys.forEach(key => {
+                try {
+                    const value = localStorage.getItem(key);
+                    if (value && value.length > 100) {
+                        log(`📝 ${key}: [长度: ${value.length}]`);
+                    } else {
+                        log(`📝 ${key}: ${value}`);
+                    }
+                } catch (e) {
+                    log(`📝 ${key}: [读取失败]`, 'error');
+                }
+            });
+        }
+
+        function analyzeAuthKeys() {
+            log('\n=== 分析CloudBase认证键 ===');
+            
+            // CloudBase SDK 常见的认证键模式
+            const patterns = [
+                'cloudbase_access_token_',
+                'cloudbase_refresh_token_',
+                'cloudbase_login_state_',
+                'tcb_',
+                'lexicon_user'
+            ];
+            
+            patterns.forEach(pattern => {
+                const keys = Object.keys(localStorage).filter(k => k.includes(pattern));
+                if (keys.length > 0) {
+                    log(`\n🔑 ${pattern}* 相关键:`, 'success');
+                    keys.forEach(key => {
+                        const value = localStorage.getItem(key);
+                        try {
+                            const parsed = JSON.parse(value);
+                            if (parsed.accessToken) {
+                                log(`  - ${key}: 包含 accessToken`);
+                            } else if (parsed.refreshToken) {
+                                log(`  - ${key}: 包含 refreshToken`);
+                            } else if (parsed.uid) {
+                                log(`  - ${key}: 包含用户ID: ${parsed.uid}`);
+                            } else {
+                                log(`  - ${key}: ${JSON.stringify(parsed).substring(0, 100)}...`);
+                            }
+                        } catch (e) {
+                            log(`  - ${key}: ${value?.substring(0, 100) || '[空值]'}...`);
+                        }
+                    });
+                } else {
+                    log(`❌ 未找到 ${pattern}* 相关键`, 'error');
+                }
+            });
+        }
+
+        function startMonitoring() {
+            log('\n=== 开始监控认证状态 ===');
+            beforeRefreshState = {};
+            
+            Object.keys(localStorage).forEach(key => {
+                if (key.includes('cloudbase') || key.includes('tcb') || key.includes('auth') || key.includes('lexicon')) {
+                    beforeRefreshState[key] = localStorage.getItem(key);
+                }
+            });
+            
+            log(`已记录 ${Object.keys(beforeRefreshState).length} 个认证相关键的状态`, 'success');
+            log('请刷新页面，然后点击"刷新后对比"按钮');
+        }
+
+        function compareAfterRefresh() {
+            log('\n=== 对比刷新前后的状态 ===');
+            
+            const afterRefreshState = {};
+            Object.keys(localStorage).forEach(key => {
+                if (key.includes('cloudbase') || key.includes('tcb') || key.includes('auth') || key.includes('lexicon')) {
+                    afterRefreshState[key] = localStorage.getItem(key);
+                }
+            });
+            
+            // 检查丢失的键
+            Object.keys(beforeRefreshState).forEach(key => {
+                if (!afterRefreshState[key]) {
+                    log(`❌ 键丢失: ${key}`, 'error');
+                } else if (beforeRefreshState[key] !== afterRefreshState[key]) {
+                    log(`⚠️ 键值改变: ${key}`);
+                }
+            });
+            
+            // 检查新增的键
+            Object.keys(afterRefreshState).forEach(key => {
+                if (!beforeRefreshState[key]) {
+                    log(`✅ 新增键: ${key}`, 'success');
+                }
+            });
+            
+            // 检查关键的认证令牌
+            const tokenKeys = Object.keys(afterRefreshState).filter(k => 
+                k.includes('access_token') || k.includes('refresh_token')
+            );
+            
+            if (tokenKeys.length > 0) {
+                log(`\n✅ 刷新后仍有 ${tokenKeys.length} 个令牌键存在`, 'success');
+            } else {
+                log('\n❌ 刷新后没有找到任何令牌键！', 'error');
+            }
+        }
+
+        function clearTestData() {
+            if (confirm('确定要清除所有认证相关数据吗？这将使您退出登录。')) {
+                log('\n=== 清除认证数据 ===');
+                const keysToRemove = Object.keys(localStorage).filter(key => 
+                    key.includes('cloudbase') || 
+                    key.includes('tcb') || 
+                    key.includes('auth') ||
+                    key.includes('lexicon')
+                );
+                
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                    log(`已删除: ${key}`);
+                });
+                
+                log(`\n✅ 已清除 ${keysToRemove.length} 个认证相关键`, 'success');
+                log('请刷新页面重新测试');
+            }
+        }
+
+        // 页面加载时自动执行一次检查
+        window.addEventListener('load', () => {
+            log('测试工具已加载，请按步骤执行测试');
+            checkStorage();
+        });
+    </script>
+</body>
+</html>

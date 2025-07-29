@@ -1,4 +1,4 @@
-import { app, ensureLogin } from '../utils/cloudbase';
+import { getApp, ensureLogin } from '../utils/cloudbase';
 import { DailyStudyPlan, DailyPlanGenerator } from './DailyPlanGenerator';
 import { SM2Service } from './sm2Service';
 import { StudyChoice } from '../types';
@@ -30,29 +30,74 @@ export interface DailyStats {
 export const dailyPlanService = {
   _sm2Service: new SM2Service(),
 
+  // 添加缓存机制
+  _planCache: new Map<string, {
+    data: DailyStudyPlan;
+    timestamp: number;
+    ttl: number;
+  }>(),
+
+  _getCacheKey(userId: string, wordbookId: string): string {
+    const today = new Date().toISOString().split('T')[0];
+    return `${userId}_${wordbookId}_${today}`;
+  },
+
   /**
-   * 获取或创建今日学习计划 - 优先使用SM-2算法
+   * 获取或创建今日学习计划 - 优先使用SM-2算法（带缓存）
    */
   async getTodayStudyPlan(userId: string, wordbookId: string): Promise<DailyStudyPlan> {
-    const today = new Date().toISOString().split('T')[0];
+    const cacheKey = this._getCacheKey(userId, wordbookId);
+    const now = Date.now();
+    
+    // 检查缓存（5分钟内有效）
+    const cached = this._planCache.get(cacheKey);
+    if (cached && now - cached.timestamp < cached.ttl) {
+      console.log('📦 使用缓存的学习计划');
+      return cached.data;
+    }
     
     try {
+      const today = new Date().toISOString().split('T')[0];
       console.log('📚 获取今日学习计划:', { userId, wordbookId, today });
       
       // 优先尝试使用SM-2算法生成计划
       const sm2Plan = await this.createSM2DailyPlan(userId, wordbookId, today);
       if (sm2Plan) {
         console.log('✅ SM-2计划创建成功');
+        // 缓存计划（5分钟TTL）
+        this._planCache.set(cacheKey, {
+          data: sm2Plan,
+          timestamp: now,
+          ttl: 5 * 60 * 1000
+        });
         return sm2Plan;
       }
       
       // 降级到传统方式
       console.log('⚠️ SM-2计划创建失败，使用传统方式');
-      return await this.getTraditionalTodayPlan(userId, wordbookId);
+      const traditionalPlan = await this.getTraditionalTodayPlan(userId, wordbookId);
+      
+      // 缓存传统计划（5分钟TTL）
+      this._planCache.set(cacheKey, {
+        data: traditionalPlan,
+        timestamp: now,
+        ttl: 5 * 60 * 1000
+      });
+      
+      return traditionalPlan;
     } catch (error) {
       console.error('获取今日学习计划失败:', error);
       // 再次降级到传统方式
-      return await this.getTraditionalTodayPlan(userId, wordbookId);
+      const fallbackPlan = await this.getTraditionalTodayPlan(userId, wordbookId);
+      
+      // 缓存降级计划（1分钟TTL）
+      this._planCache.set(cacheKey, {
+        data: fallbackPlan,
+        timestamp: now,
+        ttl: 60 * 1000
+      });
+      
+      return fallbackPlan;
     }
   },
 
@@ -62,27 +107,35 @@ export const dailyPlanService = {
   async createSM2DailyPlan(userId: string, wordbookId: string, date: string): Promise<DailyStudyPlan | null> {
     try {
       // 获取用户设置
-      let userSettings = {
+      let userSettings: any = {
+        userId,
         dailyTarget: 20,
         dailyNewWords: 10,
-        dailyReviewWords: 15
+        dailyReviewWords: 15,
+        studyMode: 'standard' as const,
+        enableVoice: true,
+        autoNext: false,
+        enableReminder: true,
+        reminderTime: '09:00'
       };
 
       try {
-        const userSettingsResult = await app.callFunction({
+        const appInstance = await getApp();
+        const userSettingsResult = await appInstance.callFunction({
           name: 'user-settings',
           data: { action: 'get', userId }
         });
 
         if (userSettingsResult.result?.success && userSettingsResult.result?.data) {
-          userSettings = userSettingsResult.result.data;
+          userSettings = { ...userSettings, ...userSettingsResult.result.data };
         }
       } catch (error) {
         console.warn('获取用户设置失败，使用默认设置:', error);
       }
 
       // 获取所有单词数据
-      const wordsResult = await app.callFunction({
+      const appInstance2 = await getApp();
+      const wordsResult = await appInstance2.callFunction({
         name: 'getWordsByWordbook',
         data: { wordbookId, limit: 1000 }
       });
@@ -105,7 +158,8 @@ export const dailyPlanService = {
 
       // 保存计划到数据库
       await ensureLogin();
-      const db = app.database();
+      const appDbInstance = await getApp();
+      const db = appDbInstance.database();
       
       // 检查是否已存在计划
       const existingResult = await db.collection('daily_study_plans')
@@ -140,7 +194,8 @@ export const dailyPlanService = {
     
     try {
       // 先尝试获取现有计划
-      const existingResult = await app.callFunction({
+      const appInstance3 = await getApp();
+      const existingResult = await appInstance3.callFunction({
         name: 'daily-plan',
         data: {
           action: 'get',
@@ -155,7 +210,8 @@ export const dailyPlanService = {
       }
       
       // 如果没有现有计划，创建新的
-      const createResult = await app.callFunction({
+      const appInstance4 = await getApp();
+      const createResult = await appInstance4.callFunction({
         name: 'daily-plan',
         data: {
           action: 'create',
@@ -181,7 +237,8 @@ export const dailyPlanService = {
    */
   async getDailyPlan(userId: string, wordbookId: string, date: string): Promise<DailyStudyPlan | null> {
     try {
-      const result = await app.callFunction({
+      const appInstance5 = await getApp();
+      const result = await appInstance5.callFunction({
         name: 'daily-plan',
         data: {
           action: 'get',
@@ -207,7 +264,8 @@ export const dailyPlanService = {
    */
   async createDailyPlan(userId: string, wordbookId: string, date: string): Promise<DailyStudyPlan> {
     try {
-      const result = await app.callFunction({
+      const appInstance5 = await getApp();
+      const result = await appInstance5.callFunction({
         name: 'daily-plan',
         data: {
           action: 'create',
@@ -267,7 +325,8 @@ export const dailyPlanService = {
     
     try {
       await ensureLogin();
-      const db = app.database();
+      const appDbInstance = await getApp();
+      const db = appDbInstance.database();
       
       // 获取当前计划
       const planResult = await db.collection('daily_study_plans')
@@ -313,7 +372,8 @@ export const dailyPlanService = {
     progressUpdate: StudyProgressUpdate
   ): Promise<DailyStudyPlan> {
     try {
-      const result = await app.callFunction({
+      const appInstance5 = await getApp();
+      const result = await appInstance5.callFunction({
         name: 'daily-plan',
         data: {
           action: 'update',
@@ -346,7 +406,8 @@ export const dailyPlanService = {
     isCompleted: boolean;
   }> {
     try {
-      const result = await app.callFunction({
+      const appInstance5 = await getApp();
+      const result = await appInstance5.callFunction({
         name: 'daily-plan',
         data: {
           action: 'progress',
@@ -387,7 +448,8 @@ export const dailyPlanService = {
       await ensureLogin();
       
       // 删除现有计划
-      const db = app.database();
+      const appDbInstance = await getApp();
+      const db = appDbInstance.database();
       await db.collection('daily_study_plans')
         .where({ userId, wordbookId, date: today })
         .remove();
@@ -405,7 +467,8 @@ export const dailyPlanService = {
    */
   async getStudyStats(userId: string, wordbookId: string, days: number = 7): Promise<DailyStats[]> {
     try {
-      const result = await app.callFunction({
+      const appInstance5 = await getApp();
+      const result = await appInstance5.callFunction({
         name: 'daily-plan',
         data: {
           action: 'stats',
@@ -434,7 +497,8 @@ export const dailyPlanService = {
       // 确保用户已登录CloudBase
       await ensureLogin();
       
-      const db = app.database();
+      const appDbInstance = await getApp();
+      const db = appDbInstance.database();
       const { data } = await db.collection('daily_study_plans')
         .where({ userId, wordbookId, isCompleted: true })
         .orderBy('date', 'desc')
@@ -474,7 +538,8 @@ export const dailyPlanService = {
       // 确保用户已登录CloudBase
       await ensureLogin();
       
-      const db = app.database();
+      const appDbInstance = await getApp();
+      const db = appDbInstance.database();
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
       

@@ -1,4 +1,4 @@
-import { app } from '../utils/cloudbase';
+import { getApp } from '../utils/cloudbase';
 import { parseCSV, parseJSON, WordData, WordbookData } from '../utils/fileUtils';
 
 export interface UploadResult {
@@ -88,7 +88,8 @@ export class UploadService {
       this.updateProgress(75, '数据验证通过', '上传到服务器');
 
       // 4. 调用云函数上传数据
-      const result = await app.callFunction({
+      const appInstance = await getApp();
+    const result = await appInstance.callFunction({
         name: 'upload-wordbook',
         data: {
           wordbookData
@@ -214,7 +215,8 @@ export class UploadService {
   // 获取上传历史记录
   async getUploadHistory(): Promise<any[]> {
     try {
-      const result = await app.callFunction({
+      const appInstance = await getApp();
+    const result = await appInstance.callFunction({
         name: 'upload-wordbook',
         data: {
           action: 'getHistory'
@@ -234,7 +236,8 @@ export class UploadService {
   // 删除上传的词书
   async deleteWordbook(wordbookId: string): Promise<boolean> {
     try {
-      const result = await app.callFunction({
+      const appInstance = await getApp();
+    const result = await appInstance.callFunction({
         name: 'upload-wordbook',
         data: {
           action: 'delete',

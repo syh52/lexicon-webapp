@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import MobileNavigation from './MobileNavigation';
 import MobileHeader from './MobileHeader';
 import PerspectiveProvider from '../shared/PerspectiveProvider';
+import { BACKGROUNDS } from '../../constants/design';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -15,10 +16,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const showMobileLayout = !noMobileLayoutPaths.includes(pathname) && !isFullScreen;
 
   if (!showMobileLayout) {
-    // For login/register pages, use a simple layout
+    // For login/register pages, use a simple centered layout
     if (noMobileLayoutPaths.includes(pathname)) {
       return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className={`${BACKGROUNDS.FULLSCREEN} flex items-center justify-center p-4`}>
           <div className="w-full max-w-md">
             {children}
           </div>
@@ -35,7 +36,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PerspectiveProvider>
       {/* Main Content Container - 桌面端使用更宽的布局 */}
-      <div className="w-full bg-gray-900 min-h-screen relative overflow-hidden perspective-1000">
+      <div className={`w-full ${BACKGROUNDS.PRIMARY} min-h-screen relative overflow-hidden perspective-1000`}>
         {/* Simplified Status Bar - Empty spacer */}
         <div className="h-[34px] relative z-50"></div>
         

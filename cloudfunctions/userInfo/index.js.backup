@@ -12,29 +12,13 @@ exports.main = async (event, context) => {
   const { action, userId, userInfo, displayName, email, password, type, adminKey, targetUserId, newRole, cloudbaseUserId, appUserId } = event;
   const { userRecord } = context;
   
-  // 详细日志记录
-  console.log('🔍 UserInfo函数调用:', {
-    action,
-    userId,
-    hasUserInfo: !!userInfo,
-    contextUserInfo: context.userInfo?.uid,
-    userRecord: userRecord?.uid,
-    timestamp: new Date().toISOString()
-  });
-  
   // 获取当前用户ID - CloudBase v2 Web应用认证
   // context.userInfo?.uid 包含CloudBase原生认证的用户ID
   const currentUserId = userId || context.userInfo?.uid || userRecord?.uid;
   
-  console.log('🔑 用户ID获取结果:', {
-    currentUserId,
-    source: userId ? 'event.userId' : context.userInfo?.uid ? 'context.userInfo.uid' : userRecord?.uid ? 'userRecord.uid' : 'none'
-  });
-  
   if (!currentUserId && !['get', 'getOrCreate', 'create', 'getUserMapping', 'establishMapping'].includes(action)) {
-    console.error('❌ 用户未登录，拒绝访问:', { action, currentUserId });
     return {
-      code: -1,
+      success: false,
       error: '用户未登录'
     };
   }
@@ -78,14 +62,14 @@ exports.main = async (event, context) => {
         
       default:
         return {
-          code: -1,
+          success: false,
           error: '未知操作类型'
         };
     }
   } catch (error) {
     console.error('UserInfo function error:', error);
     return {
-      code: -1,
+      success: false,
       error: error.message || '服务器内部错误'
     };
   }
@@ -94,23 +78,14 @@ exports.main = async (event, context) => {
 // 获取用户信息
 async function getUserInfo(userId) {
   try {
-    console.log('🔍 获取用户信息:', userId);
-    
     const userResult = await db.collection('users')
       .where({ uid: userId })
       .get();
-    
-    console.log('📁 查询结果:', {
-      found: userResult.data.length > 0,
-      count: userResult.data.length,
-      userId
-    });
 
     if (userResult.data.length === 0) {
       // 用户信息不存在，返回默认信息
-      console.log('⚠️ 用户不存在，返回默认信息:', userId);
       return {
-        code: 0,
+        success: true,
         data: {
           uid: userId,
           displayName: '新用户',
@@ -130,9 +105,8 @@ async function getUserInfo(userId) {
     }
 
     const user = userResult.data[0];
-    console.log('✅ 用户信息获取成功:', user.uid);
     return {
-      code: 0,
+      success: true,
       data: {
         uid: user.uid,
         displayName: user.displayName,
@@ -150,10 +124,9 @@ async function getUserInfo(userId) {
       }
     };
   } catch (error) {
-    console.error('❌ 获取用户信息失败:', error);
-    console.error('❌ 错误堆栈:', error.stack);
+    console.error('获取用户信息失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '获取用户信息失败：' + error.message
     };
   }
@@ -162,17 +135,14 @@ async function getUserInfo(userId) {
 // 创建用户信息
 async function createUserInfo(userId, userInfo = {}) {
   try {
-    console.log('🔄 开始创建用户:', { userId, userInfo });
-    
     // 检查用户是否已存在
     const existingUser = await db.collection('users')
       .where({ uid: userId })
       .get();
 
     if (existingUser.data.length > 0) {
-      console.log('⚠️ 用户已存在:', userId);
       return {
-        code: -1,
+        success: false,
         error: '用户信息已存在'
       };
     }
@@ -197,34 +167,28 @@ async function createUserInfo(userId, userInfo = {}) {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
-    console.log('💾 准备插入用户数据:', userData);
 
     const result = await db.collection('users').add(userData);
-    
-    console.log('📊 数据库插入结果:', result);
 
     if (result.id) {
-      console.log('✅ 用户创建成功:', { userId, insertId: result.id });
       return {
-        code: 0,
+        success: true,
         data: {
           ...userData,
           _id: result.id
         }
       };
     } else {
-      console.error('❌ 插入失败，无id返回:', result);
+      console.error('插入失败，无id返回:', result);
       return {
-        code: -1,
+        success: false,
         error: '创建用户信息失败：无法获取插入ID'
       };
     }
   } catch (error) {
-    console.error('❌ 创建用户信息失败:', error);
-    console.error('❌ 错误堆栈:', error.stack);
+    console.error('创建用户信息失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '创建用户信息失败：' + error.message
     };
   }
@@ -233,25 +197,16 @@ async function createUserInfo(userId, userInfo = {}) {
 // 获取或创建用户信息
 async function getOrCreateUserInfo(userId, userInfo = {}) {
   try {
-    console.log('🔍 开始获取或创建用户:', { userId, userInfo });
-    
     // 先尝试获取用户信息
     const userResult = await db.collection('users')
       .where({ uid: userId })
       .get();
-    
-    console.log('📁 用户查询结果:', {
-      found: userResult.data.length > 0,
-      count: userResult.data.length,
-      userId
-    });
 
     if (userResult.data.length > 0) {
       // 用户存在，返回用户信息
       const user = userResult.data[0];
-      console.log('✅ 用户已存在，返回信息:', user.uid);
       return {
-        code: 0,
+        success: true,
         data: {
           uid: user.uid,
           displayName: user.displayName,
@@ -270,24 +225,12 @@ async function getOrCreateUserInfo(userId, userInfo = {}) {
       };
     } else {
       // 用户不存在，创建新用户
-      console.log('🆕 用户不存在，开始创建:', userId);
-      const createResult = await createUserInfo(userId, userInfo);
-      
-      if (createResult.success) {
-        console.log('✅ 用户创建成功:', createResult.data.uid);
-        // 为新用户添加标记
-        createResult.data.isNewUser = true;
-      } else {
-        console.error('❌ 用户创建失败:', createResult.error);
-      }
-      
-      return createResult;
+      return await createUserInfo(userId, userInfo);
     }
   } catch (error) {
-    console.error('❌ 获取或创建用户信息失败:', error);
-    console.error('❌ 错误堆栈:', error.stack);
+    console.error('获取或创建用户信息失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '获取或创建用户信息失败：' + error.message
     };
   }
@@ -298,7 +241,7 @@ async function updateUserInfo(userId, userInfo) {
   try {
     if (!userInfo || Object.keys(userInfo).length === 0) {
       return {
-        code: -1,
+        success: false,
         error: '更新信息不能为空'
       };
     }
@@ -338,19 +281,19 @@ async function updateUserInfo(userId, userInfo) {
         .get();
         
       return {
-        code: 0,
+        success: true,
         data: updatedUser.data[0]
       };
     } else {
       return {
-        code: -1,
+        success: false,
         error: '更新失败'
       };
     }
   } catch (error) {
     console.error('更新用户信息失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '更新用户信息失败：' + error.message
     };
   }
@@ -361,7 +304,7 @@ async function updateUserInfoByIdentifier(identifier, userInfo, type = 'email') 
   try {
     if (!userInfo || Object.keys(userInfo).length === 0) {
       return {
-        code: -1,
+        success: false,
         error: '更新信息不能为空'
       };
     }
@@ -374,7 +317,7 @@ async function updateUserInfoByIdentifier(identifier, userInfo, type = 'email') 
 
     if (userResult.data.length === 0) {
       return {
-        code: -1,
+        success: false,
         error: '用户不存在'
       };
     }
@@ -406,19 +349,19 @@ async function updateUserInfoByIdentifier(identifier, userInfo, type = 'email') 
         .get();
         
       return {
-        code: 0,
+        success: true,
         data: updatedUser.data[0]
       };
     } else {
       return {
-        code: -1,
+        success: false,
         error: '更新失败'
       };
     }
   } catch (error) {
     console.error('更新用户信息失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '更新用户信息失败：' + error.message
     };
   }
@@ -431,7 +374,7 @@ async function promoteUserWithKey(userId, adminKey) {
   try {
     if (!adminKey) {
       return {
-        code: -1,
+        success: false,
         error: '管理员密钥不能为空'
       };
     }
@@ -472,7 +415,7 @@ async function promoteUserWithKey(userId, adminKey) {
     
     if (!targetRole) {
       return {
-        code: -1,
+        success: false,
         error: '无效的管理员密钥'
       };
     }
@@ -505,7 +448,7 @@ async function promoteUserWithKey(userId, adminKey) {
       const createResult = await db.collection('users').add(newUserData);
       if (!createResult.id) {
         return {
-          code: -1,
+          success: false,
           error: '创建用户失败'
         };
       }
@@ -552,7 +495,7 @@ async function promoteUserWithKey(userId, adminKey) {
       });
       
       return {
-        code: 0,
+        success: true,
         data: {
           message: `成功提升为${targetRole === 'super_admin' ? '超级管理员' : '管理员'}`,
           role: targetRole,
@@ -561,14 +504,14 @@ async function promoteUserWithKey(userId, adminKey) {
       };
     } else {
       return {
-        code: -1,
+        success: false,
         error: '权限提升失败'
       };
     }
   } catch (error) {
     console.error('权限提升失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '权限提升失败：' + error.message
     };
   }
@@ -584,7 +527,7 @@ async function promoteUserByAdmin(adminUserId, targetUserId, newRole) {
 
     if (adminResult.data.length === 0) {
       return {
-        code: -1,
+        success: false,
         error: '操作者不存在'
       };
     }
@@ -592,7 +535,7 @@ async function promoteUserByAdmin(adminUserId, targetUserId, newRole) {
     const admin = adminResult.data[0];
     if (admin.role !== 'super_admin') {
       return {
-        code: -1,
+        success: false,
         error: '只有超级管理员可以提升其他用户权限'
       };
     }
@@ -604,7 +547,7 @@ async function promoteUserByAdmin(adminUserId, targetUserId, newRole) {
 
     if (targetResult.data.length === 0) {
       return {
-        code: -1,
+        success: false,
         error: '目标用户不存在'
       };
     }
@@ -619,7 +562,7 @@ async function promoteUserByAdmin(adminUserId, targetUserId, newRole) {
       permissions = ['basic_learning'];
     } else {
       return {
-        code: -1,
+        success: false,
         error: '无效的角色类型'
       };
     }
@@ -649,7 +592,7 @@ async function promoteUserByAdmin(adminUserId, targetUserId, newRole) {
       });
       
       return {
-        code: 0,
+        success: true,
         data: {
           message: `成功将用户权限修改为${newRole === 'admin' ? '管理员' : '普通用户'}`,
           targetUser: {
@@ -662,14 +605,14 @@ async function promoteUserByAdmin(adminUserId, targetUserId, newRole) {
       };
     } else {
       return {
-        code: -1,
+        success: false,
         error: '权限修改失败'
       };
     }
   } catch (error) {
     console.error('权限修改失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '权限修改失败：' + error.message
     };
   }
@@ -685,7 +628,7 @@ async function listUsers(adminUserId) {
 
     if (adminResult.data.length === 0) {
       return {
-        code: -1,
+        success: false,
         error: '操作者不存在'
       };
     }
@@ -693,7 +636,7 @@ async function listUsers(adminUserId) {
     const admin = adminResult.data[0];
     if (!admin.role || !['admin', 'super_admin'].includes(admin.role)) {
       return {
-        code: -1,
+        success: false,
         error: '权限不足，需要管理员权限'
       };
     }
@@ -722,7 +665,7 @@ async function listUsers(adminUserId) {
     }));
 
     return {
-      code: 0,
+      success: true,
       data: {
         users: users,
         total: users.length
@@ -731,7 +674,7 @@ async function listUsers(adminUserId) {
   } catch (error) {
     console.error('获取用户列表失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '获取用户列表失败：' + error.message
     };
   }
@@ -742,7 +685,7 @@ async function getUserMapping(cloudbaseUserId) {
   try {
     if (!cloudbaseUserId) {
       return {
-        code: -1,
+        success: false,
         error: 'CloudBase用户ID不能为空'
       };
     }
@@ -754,14 +697,14 @@ async function getUserMapping(cloudbaseUserId) {
 
     if (mappingResult.data.length === 0) {
       return {
-        code: -1,
+        success: false,
         error: '未找到用户ID映射关系'
       };
     }
 
     const mapping = mappingResult.data[0];
     return {
-      code: 0,
+      success: true,
       data: {
         cloudbaseUserId: mapping.cloudbase_uid,
         appUserId: mapping.app_uid,
@@ -772,7 +715,7 @@ async function getUserMapping(cloudbaseUserId) {
   } catch (error) {
     console.error('获取用户ID映射失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '获取用户ID映射失败：' + error.message
     };
   }
@@ -783,7 +726,7 @@ async function establishMapping(cloudbaseUserId, appUserId) {
   try {
     if (!cloudbaseUserId || !appUserId) {
       return {
-        code: -1,
+        success: false,
         error: 'CloudBase用户ID和应用用户ID都不能为空'
       };
     }
@@ -798,7 +741,7 @@ async function establishMapping(cloudbaseUserId, appUserId) {
       const existing = existingMapping.data[0];
       if (existing.app_uid === appUserId) {
         return {
-          code: 0,
+          success: true,
           data: {
             message: '用户ID映射已存在',
             cloudbaseUserId: existing.cloudbase_uid,
@@ -816,7 +759,7 @@ async function establishMapping(cloudbaseUserId, appUserId) {
 
         if (updateResult.updated > 0) {
           return {
-            code: 0,
+            success: true,
             data: {
               message: '用户ID映射已更新',
               cloudbaseUserId: cloudbaseUserId,
@@ -825,7 +768,7 @@ async function establishMapping(cloudbaseUserId, appUserId) {
           };
         } else {
           return {
-            code: -1,
+            success: false,
             error: '更新用户ID映射失败'
           };
         }
@@ -844,7 +787,7 @@ async function establishMapping(cloudbaseUserId, appUserId) {
       if (result.id) {
         console.log('用户ID映射创建成功:', { cloudbaseUserId, appUserId });
         return {
-          code: 0,
+          success: true,
           data: {
             message: '用户ID映射创建成功',
             cloudbaseUserId: cloudbaseUserId,
@@ -854,7 +797,7 @@ async function establishMapping(cloudbaseUserId, appUserId) {
         };
       } else {
         return {
-          code: -1,
+          success: false,
           error: '创建用户ID映射失败'
         };
       }
@@ -862,7 +805,7 @@ async function establishMapping(cloudbaseUserId, appUserId) {
   } catch (error) {
     console.error('建立用户ID映射失败:', error);
     return {
-      code: -1,
+      success: false,
       error: '建立用户ID映射失败：' + error.message
     };
   }

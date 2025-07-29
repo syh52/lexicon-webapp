@@ -107,6 +107,14 @@
       "entry": "index.js",
       "runtime": "Nodejs18.15",
       "installDependency": true
+    },
+    {
+      "name": "batchSaveStudyRecords",
+      "description": "批量保存学习记录 - 高性能批量插入/更新学习记录，避免大量API调用",
+      "source": "cloudfunctions/batchSaveStudyRecords",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true
     }
   ],
   "hosting": {

@@ -1,4 +1,4 @@
-import { app, ensureLogin } from '../utils/cloudbase';
+import { getApp, ensureLogin } from '../utils/cloudbase';
 import { SM2Service } from './sm2Service';
 import { SM2Card, StudyChoice, SM2CardStatus } from '../types';
 
@@ -49,7 +49,8 @@ export const wordbookService = {
    */
   async getWordbooks(): Promise<Wordbook[]> {
     try {
-      const result = await app.callFunction({
+      const appInstance = await getApp();
+    const result = await appInstance.callFunction({
         name: 'getWordbooks',
         data: {}
       });
@@ -70,7 +71,8 @@ export const wordbookService = {
    */
   async getWordsByWordbook(wordbookId: string, limit?: number, offset?: number): Promise<Word[]> {
     try {
-      const result = await app.callFunction({
+      const appInstance = await getApp();
+    const result = await appInstance.callFunction({
         name: 'getWordsByWordbook',
         data: { wordbookId, limit, offset }
       });

@@ -4,7 +4,7 @@
  * 处理数据格式转换和兼容性
  */
 
-import { app, ensureLogin, getCurrentUserId } from '../utils/cloudbase';
+import { getApp, ensureLogin, getCurrentUserId } from '../utils/cloudbase';
 import { 
   SM2Card, 
   SM2CardStatus, 
@@ -39,6 +39,15 @@ const DEFAULT_CONFIG: SM2ServiceConfig = {
 export class SM2Service {
   private scheduler = new SM2Scheduler();
   private config: SM2ServiceConfig;
+  
+  // 🚀 添加缓存机制，避免重复API调用
+  private cardsCache = new Map<string, {
+    cards: SM2Card[];
+    timestamp: number;
+    ttl: number;
+  }>();
+  
+  private static readonly CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
 
   constructor(config: Partial<SM2ServiceConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -92,14 +101,13 @@ export class SM2Service {
       sm2Card: card,
       repetitions: card.repetitions,
       EF: card.EF,
-      interval: card.interval,
-      algorithm: 'sm2'
+      interval: card.interval
     };
   }
 
   /**
-   * 获取用户的SM2学习记录
-   * 修复版本：使用正确的用户ID进行数据查询
+   * 获取用户的SM2学习记录（带缓存优化）
+   * 修复版本：使用正确的用户ID进行数据查询，添加缓存机制
    */
   async getUserSM2Records(uid: string, wordbookId: string): Promise<SM2Card[]> {
     try {
@@ -109,6 +117,15 @@ export class SM2Service {
       const dataUserId = await getCurrentUserId('data'); // 用于数据访问
       const queryUserId = dataUserId || uid; // 回退到传入的uid
       
+      // 🚀 检查缓存
+      const cacheKey = `${queryUserId}:${wordbookId}`;
+      const cached = this.cardsCache.get(cacheKey);
+      
+      if (cached && (Date.now() - cached.timestamp < cached.ttl)) {
+        console.log(`⚡ 使用缓存的学习记录: ${cached.cards.length} 条`);
+        return cached.cards;
+      }
+      
       console.log('🔍 SM2服务查询学习记录:', {
         原始uid: uid,
         数据查询用户ID: queryUserId,
@@ -116,7 +133,8 @@ export class SM2Service {
       });
       
       // 从云数据库获取学习记录
-      const db = app.database();
+      const appInstance = await getApp();
+      const db = appInstance.database();
       const result = await db.collection('study_records')
         .where({
           uid: queryUserId,
@@ -129,7 +147,16 @@ export class SM2Service {
       console.log(`📚 找到 ${records.length} 条学习记录`);
       
       // 转换为SM2Card格式
-      return records.map(record => this.convertToSM2Card(record));
+      const cards = records.map(record => this.convertToSM2Card(record));
+      
+      // 🚀 缓存结果
+      this.cardsCache.set(cacheKey, {
+        cards,
+        timestamp: Date.now(),
+        ttl: SM2Service.CACHE_TTL
+      });
+      
+      return cards;
       
     } catch (error) {
       console.error('获取SM2学习记录失败:', error);
@@ -150,7 +177,8 @@ export class SM2Service {
       const saveUserId = dataUserId || uid; // 回退到传入的uid
       
       const studyRecord = this.convertToStudyRecord(card, saveUserId, wordbookId);
-      const db = app.database();
+      const appInstance = await getApp();
+      const db = appInstance.database();
       
       console.log('💾 SM2服务保存学习记录:', {
         原始uid: uid,
@@ -183,6 +211,26 @@ export class SM2Service {
         console.log('✅ 创建新学习记录成功');
       }
       
+      // 🗑️ 智能缓存更新：只更新单个记录，不清除整个缓存
+      const cacheKey = `${saveUserId}:${wordbookId}`;
+      const cached = this.cardsCache.get(cacheKey);
+      if (cached) {
+        // 更新缓存中的单个卡片，而不是清除整个缓存
+        const updatedCards = cached.cards.map(c => 
+          c.wordId === card.wordId ? card : c
+        );
+        // 如果是新卡片，添加到缓存
+        if (!cached.cards.find(c => c.wordId === card.wordId)) {
+          updatedCards.push(card);
+        }
+        this.cardsCache.set(cacheKey, {
+          cards: updatedCards,
+          timestamp: cached.timestamp, // 保持原始时间戳
+          ttl: cached.ttl
+        });
+        console.log('📝 更新缓存中的单个卡片，保持缓存有效性');
+      }
+      
     } catch (error) {
       console.error('保存SM2学习记录失败:', error);
       throw new Error(`保存学习记录失败: ${error.message}`);
@@ -190,7 +238,8 @@ export class SM2Service {
   }
 
   /**
-   * 批量保存SM2学习记录
+   * 批量保存SM2学习记录（高性能版本）
+   * 使用云函数实现真正的批量插入，避免大量API调用
    */
   async batchSaveSM2Records(
     cards: SM2Card[], 
@@ -198,17 +247,58 @@ export class SM2Service {
     wordbookId: string
   ): Promise<void> {
     try {
-      const batches = this.chunkArray(cards, this.config.batchSize);
+      await ensureLogin();
       
-      for (const batch of batches) {
-        await Promise.all(
-          batch.map(card => this.saveSM2Record(card, uid, wordbookId))
-        );
+      // 🔧 使用智能用户ID获取功能
+      const dataUserId = await getCurrentUserId('data');
+      const saveUserId = dataUserId || uid;
+      
+      console.log(`💾 批量保存 ${cards.length} 条SM2学习记录`, {
+        用户ID: saveUserId,
+        词书ID: wordbookId
+      });
+      
+      // 将SM2Card转换为StudyRecord格式
+      const studyRecords = cards.map(card => 
+        this.convertToStudyRecord(card, saveUserId, wordbookId)
+      );
+      
+      // 🚀 使用云函数批量保存，一次API调用完成所有数据插入
+      const appInstance = await getApp();
+      const result = await appInstance.callFunction({
+        name: 'batchSaveStudyRecords',
+        data: {
+          records: studyRecords,
+          wordbookId,
+          uid: saveUserId
+        }
+      });
+      
+      if (result.result?.success) {
+        console.log(`✅ 批量保存成功: ${result.result.savedCount}/${cards.length} 条记录`);
+      } else {
+        console.error('批量保存失败:', result.result?.error);
+        throw new Error(result.result?.error || '批量保存失败');
       }
       
     } catch (error) {
       console.error('批量保存SM2记录失败:', error);
-      throw error;
+      
+      // 🔄 回退策略：如果云函数失败，使用分批保存
+      console.log('尝试使用回退策略进行分批保存...');
+      try {
+        const batches = this.chunkArray(cards, Math.min(10, this.config.batchSize));
+        
+        for (const batch of batches) {
+          await Promise.all(
+            batch.map(card => this.saveSM2Record(card, uid, wordbookId))
+          );
+        }
+        console.log('✅ 回退策略保存成功');
+      } catch (fallbackError) {
+        console.error('回退策略也失败了:', fallbackError);
+        throw fallbackError;
+      }
     }
   }
 
@@ -302,8 +392,8 @@ export class SM2Service {
   }
 
   /**
-   * 为新用户创建初始学习卡片
-   * 修复版本：使用正确的用户ID进行数据关联
+   * 为新用户创建初始学习卡片（高性能版本）
+   * 修复版本：使用正确的用户ID进行数据关联，添加缓存机制
    */
   private async createInitialCardsForNewUser(
     uid: string,
@@ -316,8 +406,22 @@ export class SM2Service {
       const dataUserId = await getCurrentUserId('data');
       const actualUserId = dataUserId || uid;
       
+      console.log(`🆕 为新用户创建初始学习卡片`, {
+        用户ID: actualUserId,
+        词书ID: wordbookId,
+        最大卡片数: maxCards
+      });
+      
+      // 🔍 先检查是否已有部分学习记录（避免重复创建）
+      const existingCards = await this.getUserSM2Records(actualUserId, wordbookId);
+      if (existingCards.length > 0) {
+        console.log(`🔄 发现 ${existingCards.length} 张已有卡片，跳过重复创建`);
+        return existingCards.slice(0, maxCards);
+      }
+
       // 获取词书中的所有单词
-      const wordsResult = await app.callFunction({
+      const appInstance = await getApp();
+      const wordsResult = await appInstance.callFunction({
         name: 'getWordsByWordbook',
         data: { wordbookId, limit: maxCards || 1000 }
       });
@@ -330,22 +434,34 @@ export class SM2Service {
       const words = wordsResult.result.data;
       const initialCards: SM2Card[] = [];
 
-      // 为每个单词创建新的SM-2卡片（但先不保存到数据库）
-      for (const word of words.slice(0, maxCards)) {
+      // 🚀 批量创建SM-2卡片（内存操作，速度快）
+      const targetWords = words.slice(0, maxCards);
+      for (const word of targetWords) {
         const newCard = createSM2Card(word._id, currentDate);
         initialCards.push(newCard);
       }
 
-      // 批量保存到数据库（避免过多的数据库写入操作）
+      // 📊 批量保存到数据库（一次API调用）
       if (this.config.enableCloudSync && initialCards.length > 0) {
         try {
+          console.log(`💾 开始批量保存 ${initialCards.length} 张初始卡片...`);
+          const startTime = Date.now();
+          
           await this.batchSaveSM2Records(initialCards, actualUserId, wordbookId);
+          
+          const saveTime = Date.now() - startTime;
+          console.log(`✅ 批量保存完成，用时 ${saveTime}ms`);
+          
+          // 🗑️ 清除缓存，确保下次查询获取最新数据
+          this.clearCache(actualUserId, wordbookId);
+          
         } catch (error) {
           console.warn('批量保存初始卡片失败，但继续返回卡片用于学习:', error);
+          // 即使保存失败，也返回内存中的卡片，不影响用户体验
         }
       }
 
-      console.log(`为用户 ${actualUserId} 创建了 ${initialCards.length} 张初始学习卡片`);
+      console.log(`🎯 为用户 ${actualUserId} 创建了 ${initialCards.length} 张初始学习卡片`);
       return initialCards;
 
     } catch (error) {
@@ -382,6 +498,27 @@ export class SM2Service {
   }
 
   // 私有辅助方法
+
+  /**
+   * 清除指定用户和词书的缓存
+   */
+  private clearCache(uid: string, wordbookId: string): void {
+    const cacheKey = `${uid}:${wordbookId}`;
+    this.cardsCache.delete(cacheKey);
+    console.log(`🗑️ 清除缓存: ${cacheKey}`);
+  }
+
+  /**
+   * 清除所有过期缓存
+   */
+  private cleanExpiredCache(): void {
+    const now = Date.now();
+    this.cardsCache.forEach((value, key) => {
+      if (now - value.timestamp >= value.ttl) {
+        this.cardsCache.delete(key);
+      }
+    });
+  }
 
   /**
    * 从旧版记录迁移到SM2格式

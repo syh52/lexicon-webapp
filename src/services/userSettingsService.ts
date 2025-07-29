@@ -1,4 +1,4 @@
-import { app, ensureLogin } from '../utils/cloudbase';
+import { getApp, ensureLogin } from '../utils/cloudbase';
 
 // 用户设置接口
 export interface UserSettings {
@@ -75,7 +75,8 @@ export const userSettingsService = {
       // 确保用户已登录CloudBase
       await ensureLogin();
       
-      const db = app.database();
+      const appInstance = await getApp();
+      const db = appInstance.database();
       const { data } = await db.collection('user_settings')
         .where({ userId })
         .get();
@@ -113,7 +114,8 @@ export const userSettingsService = {
       // 确保用户已登录CloudBase
       await ensureLogin();
       
-      const db = app.database();
+      const appInstance = await getApp();
+      const db = appInstance.database();
       
       // 验证设置合理性
       const validatedSettings = this.validateSettings(settings);
