@@ -47,7 +47,8 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
   }
 
   // 需要管理员权限但用户不是管理员
-  if (requireAdmin && !user.isAdmin) {
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+  if (requireAdmin && !isAdmin) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="text-center max-w-md">

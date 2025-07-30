@@ -52,7 +52,7 @@ export const TodayStudyTask: React.FC<TodayStudyTaskProps> = ({ className = '' }
       setIsLoading(true);
       setError(null);
 
-      // 获取用户的词书列表，找到第一个活跃的词书
+      // 获取用户的词书列表
       const wordbooks = await wordbookService.getWordbooks();
       if (wordbooks.length === 0) {
         setTaskData({
@@ -68,8 +68,37 @@ export const TodayStudyTask: React.FC<TodayStudyTaskProps> = ({ className = '' }
         return;
       }
 
-      // 暂时使用第一个词书，后续可以根据用户设置选择活跃词书
-      const activeWordbook = wordbooks[0];
+      // 🔍 获取用户设置中选择的词书
+      let activeWordbook = wordbooks[0]; // 默认使用第一个词书作为备选
+      
+      try {
+        // 获取用户学习计划设置
+        const { getApp } = await import('../../utils/cloudbase');
+        const app = await getApp();
+        const settingsResult = await app.callFunction({
+          name: 'user-settings',
+          data: { 
+            action: 'get',
+            userId: user!.uid
+          }
+        });
+
+        if (settingsResult.result?.success && settingsResult.result.data?.selectedWordbookId) {
+          const selectedWordbookId = settingsResult.result.data.selectedWordbookId;
+          const selectedWordbook = wordbooks.find(w => w._id === selectedWordbookId);
+          
+          if (selectedWordbook) {
+            activeWordbook = selectedWordbook;
+            console.log('✅ 使用用户设置中选择的词书:', selectedWordbook.name);
+          } else {
+            console.warn('⚠️ 用户设置中的词书不存在，使用默认词书:', wordbooks[0].name);
+          }
+        } else {
+          console.log('ℹ️ 用户未设置选择词书，使用默认词书:', wordbooks[0].name);
+        }
+      } catch (settingsError) {
+        console.warn('⚠️ 获取用户设置失败，使用默认词书:', settingsError);
+      }
       
       try {
         // 🔄 使用统一学习计划服务

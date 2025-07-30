@@ -20,23 +20,42 @@ export const RequireAdmin: React.FC<RequireAdminProps> = ({
 
   // 检查权限
   const hasRequiredPermission = () => {
-    if (!user) return false;
+    if (!user) {
+      console.log('🚫 RequireAdmin: 用户未登录');
+      return false;
+    }
+    
+    console.log('🔍 RequireAdmin 权限检查:', {
+      userId: user.uid,
+      userRole: user.role,
+      userPermissions: user.permissions,
+      requiredPermission: permission,
+      requiredRole: role,
+      hasPermissionResult: permission ? hasPermission(permission) : 'N/A',
+      hasRoleResult: role ? hasRole(role) : 'N/A',
+      isAdmin: isAdmin,
+      isSuperAdmin: isSuperAdmin
+    });
     
     // 如果指定了具体权限，检查权限
     if (permission && !hasPermission(permission)) {
+      console.log('❌ RequireAdmin: 权限检查失败 -', permission);
       return false;
     }
     
     // 如果指定了角色，检查角色
     if (role && !hasRole(role)) {
+      console.log('❌ RequireAdmin: 角色检查失败 -', role);
       return false;
     }
     
     // 如果没有指定具体要求，至少需要管理员权限
     if (!permission && !role && !isAdmin) {
+      console.log('❌ RequireAdmin: 默认管理员权限检查失败');
       return false;
     }
     
+    console.log('✅ RequireAdmin: 权限检查通过');
     return true;
   };
 

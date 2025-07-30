@@ -141,60 +141,15 @@ export default function UploadPage() {
     navigate('/wordbooks');
   }, [navigate]);
 
-  // 权限检查 - 如果没有批量上传权限，显示权限提升界面
-  if (!hasPermission('batch_upload')) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 px-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <div className="mb-6">
-            <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
-              <Upload className="w-8 h-8 text-amber-600" />
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              需要管理员权限
-            </h2>
-            <p className="text-gray-600 mb-4">
-              批量上传功能需要管理员权限才能使用。请使用管理员密钥来获取权限。
-            </p>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-blue-800 text-left">
-                  <p className="font-medium mb-1">批量上传功能包括：</p>
-                  <ul className="space-y-1 text-blue-700">
-                    <li>• 单词库批量导入</li>
-                    <li>• 对话库批量导入</li>
-                    <li>• CSV/JSON 格式支持</li>
-                    <li>• 数据预览和验证</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            
-            <div className="text-sm text-gray-600 mb-4">
-              当前用户角色：
-              <span className="ml-2 px-2 py-1 bg-gray-100 rounded text-xs">
-                {user?.role === 'super_admin' ? '超级管理员' : 
-                 user?.role === 'admin' ? '管理员' : '普通用户'}
-              </span>
-            </div>
-            
-            <PromoteButton className="w-full" />
-            
-            <button 
-              onClick={() => navigate('/')}
-              className="w-full px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              返回首页
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // 调试权限信息
+  console.log('🔍 UploadPage 权限检查:', {
+    user: user?.uid,
+    role: user?.role,
+    permissions: user?.permissions,
+    hasPermission: hasPermission('batch_upload'),
+    isAdmin: isAdmin,
+    isSuperAdmin: user?.role === 'super_admin'
+  });
 
   return (
     <BatchUploadOnly>
