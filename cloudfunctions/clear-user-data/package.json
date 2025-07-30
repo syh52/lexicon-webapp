@@ -1,0 +1,15 @@
+{
+  "name": "clear-user-data",
+  "version": "1.0.0",
+  "description": "清除用户学习数据云函数 - 开发测试专用",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.5.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": ["cloudbase", "admin", "data-management", "development"],
+  "author": "Lexicon Development Team",
+  "license": "MIT"
+}

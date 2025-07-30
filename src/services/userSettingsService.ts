@@ -1,4 +1,5 @@
 import { getApp, ensureLogin } from '../utils/cloudbase';
+import { crossDeviceSyncService } from './crossDeviceSyncService';
 
 // 用户设置接口
 export interface UserSettings {
@@ -130,6 +131,8 @@ export const userSettingsService = {
         updatedAt: new Date()
       };
       
+      let result: UserSettings;
+      
       if (existingSettings && existingSettings.length > 0) {
         // 更新现有设置
         const existingRecord = existingSettings[0];
@@ -137,7 +140,7 @@ export const userSettingsService = {
           .doc(existingRecord._id)
           .update(updateData);
         
-        return { ...existingRecord, ...updateData };
+        result = { ...existingRecord, ...updateData };
       } else {
         // 创建新设置
         const newSettings: UserSettings = {
@@ -149,8 +152,19 @@ export const userSettingsService = {
         };
         
         await db.collection('user_settings').add(newSettings);
-        return newSettings;
+        result = newSettings;
       }
+      
+      // 🔄 触发跨设备同步
+      try {
+        crossDeviceSyncService.triggerFullSync().catch(err => 
+          console.warn('🔄 设置更新后同步失败:', err)
+        );
+      } catch (syncError) {
+        console.warn('🔄 同步服务调用失败:', syncError);
+      }
+      
+      return result;
     } catch (error) {
       console.error('更新用户设置失败:', error);
       throw error;

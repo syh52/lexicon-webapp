@@ -304,6 +304,13 @@ export class DailyStudySession {
   getAllCards(): SM2Card[] {
     return [...this.reviewQueue, ...this.repeatQueue, ...this.completedCards];
   }
+
+  /**
+   * 获取总卡片数量
+   */
+  getTotalCards(): number {
+    return this.reviewQueue.length + this.repeatQueue.length + this.completedCards.length;
+  }
 }
 
 // 便捷函数导出

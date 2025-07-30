@@ -90,6 +90,11 @@ function App() {
                   <lazyRoutes.VoiceAssistantPage />
                 </RequireAuth>
               } />
+              <Route path="/study-settings" element={
+                <RequireAuth>
+                  <lazyRoutes.StudySettingsPage />
+                </RequireAuth>
+              } />
               <Route path="/test" element={<lazyRoutes.TestPage />} />
               <Route path="*" element={<lazyRoutes.NotFoundPage />} />
             </Routes>

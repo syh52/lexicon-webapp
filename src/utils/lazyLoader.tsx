@@ -363,6 +363,15 @@ export const lazyRoutes = {
     'AdminPage'
   ),
 
+  StudySettingsPage: createLazyComponent(
+    () => import('../pages/StudySettingsPage'),
+    { 
+      fallback: () => <PageLoader text="加载学习设置" />,
+      delay: 100
+    },
+    'StudySettingsPage'
+  ),
+
 };
 
 /**
@@ -438,6 +447,9 @@ export class RoutePreloader {
         break;
       case 'AuthPage':
         preloadComponent(() => import('../pages/AuthPage'));
+        break;
+      case 'StudySettingsPage':
+        preloadComponent(() => import('../pages/StudySettingsPage'));
         break;
     }
   }

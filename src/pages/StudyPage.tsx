@@ -10,6 +10,8 @@ import { DailyStudySession } from '../utils/sm2Algorithm';
 import { StudyChoice, SM2Card } from '../types';
 import { getApp, ensureLogin } from '../utils/cloudbase';
 import { studySessionService, StudySessionState } from '../services/studySessionService';
+import { crossDeviceSyncService } from '../services/crossDeviceSyncService';
+import { unifiedStudyPlanService } from '../services/unifiedStudyPlanService';
 import { BACKGROUNDS, TEXT_COLORS } from '../constants/design';
 
 interface StudySession {
@@ -122,6 +124,9 @@ export default function StudyPage() {
       setIsInitializing(true);
       setIsLoading(true);
       
+      // 🔄 启动跨设备同步服务
+      crossDeviceSyncService.startAutoSync();
+      
       // 更新初始化状态
       initializationRef.current = {
         userId: stableUserId,
@@ -140,15 +145,31 @@ export default function StudyPage() {
       const startTime = Date.now();
       console.log('🚀 开始并行加载学习数据...');
       
-      // 🔥 关键优化：并行执行独立的异步操作
-      const [savedSessionState, todayPlan, appInstance] = await Promise.all([
-        // 组1：检查已保存的学习进度
-        studySessionService.loadStudyProgress(user.uid, wordbookId),
-        // 组2：获取今日学习计划
-        dailyPlanService.getTodayStudyPlan(user.uid, wordbookId),
-        // 组3：确保CloudBase连接 + 获取app实例
-        ensureLogin().then(() => getApp())
+      // 🔥 关键优化：使用统一学习计划服务 + 并行执行
+      const [unifiedPlan, appInstance] = await Promise.all([
+        // 组1：获取统一学习计划（包含所有必要数据）
+        unifiedStudyPlanService.getUnifiedStudyPlan(user.uid, wordbookId),
+        // 组2：确保CloudBase连接 + 获取app实例
+        ensureLogin().then(() => getApp()),
+        // 组3：触发跨设备同步（不阻塞主流程）
+        crossDeviceSyncService.triggerFullSync().catch(err => 
+          console.warn('🔄 跨设备同步失败:', err)
+        )
       ]);
+      
+      // 从统一计划中提取数据
+      const savedSessionState = unifiedPlan.actualSession.sessionState;
+      const todayPlan = {
+        userId: unifiedPlan.userId,
+        wordbookId: unifiedPlan.wordbookId,
+        date: unifiedPlan.date,
+        totalCount: unifiedPlan.actualSession.totalCards,
+        completedCount: unifiedPlan.actualSession.completedCards,
+        isCompleted: unifiedPlan.displayPlan.isCompleted,
+        newWordsCount: unifiedPlan.displayPlan.newWordsCount,
+        reviewWordsCount: unifiedPlan.displayPlan.reviewWordsCount,
+        stats: unifiedPlan.stats
+      } as DailyStudyPlan;
       
       if (!todayPlan) {
         console.error('无法获取今日学习计划');
@@ -301,6 +322,11 @@ export default function StudyPage() {
     if (stableUserId && wordbookId) {
       initializeStudySession();
     }
+    
+    // 清理函数：组件卸载时停止同步服务
+    return () => {
+      crossDeviceSyncService.stopAutoSync();
+    };
   }, [stableUserId, wordbookId, initializeStudySession]);
 
   const handleChoice = async (choice: StudyChoice) => {

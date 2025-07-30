@@ -25,7 +25,11 @@ import {
   Database,
   RefreshCw,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Trash2,
+  UserMinus,
+  Calendar,
+  AlertCircle
 } from 'lucide-react';
 import { BACKGROUNDS, TEXT_COLORS } from '../constants/design';
 
@@ -54,7 +58,7 @@ interface AdminStats {
 
 const AdminPage: React.FC = () => {
   const { user, isSuperAdmin, isAdmin, promoteWithKey } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'keys' | 'promote' | 'migration'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'keys' | 'promote' | 'migration' | 'data-management'>('dashboard');
   const [loading, setLoading] = useState(false);
   
   // 权限提升相关状态
@@ -85,6 +89,14 @@ const AdminPage: React.FC = () => {
   const [migrationData, setMigrationData] = useState<any>(null);
   const [migrationLoading, setMigrationLoading] = useState(false);
   const [migrationResults, setMigrationResults] = useState<any>(null);
+  
+  // 用户数据清除相关状态
+  const [clearDataLoading, setClearDataLoading] = useState(false);
+  const [userDataStats, setUserDataStats] = useState<any>(null);
+  const [allUsersData, setAllUsersData] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [adminSecret, setAdminSecret] = useState('');
+  const [clearResults, setClearResults] = useState<any>(null);
 
   // 加载数据
   useEffect(() => {
@@ -95,6 +107,8 @@ const AdminPage: React.FC = () => {
       loadUsers();
     } else if (activeTab === 'migration' && isSuperAdmin) {
       analyzeMigrationData();
+    } else if (activeTab === 'data-management' && isSuperAdmin) {
+      loadAllUsersData();
     }
   }, [activeTab, isSuperAdmin]);
 
@@ -167,6 +181,181 @@ const AdminPage: React.FC = () => {
       console.error('加载用户列表失败:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 加载所有用户数据统计
+  const loadAllUsersData = async () => {
+    try {
+      setClearDataLoading(true);
+      await ensureLogin();
+      const app = await getApp();
+      
+      const result = await app.callFunction({
+        name: 'clear-user-data',
+        data: { 
+          action: 'list_all_users',
+          adminKey: 'LEXICON_SUPER_ADMIN_2025'
+        }
+      });
+      
+      if (result.result?.success) {
+        setAllUsersData(result.result.users);
+      } else {
+        throw new Error(result.result?.error || '获取用户数据失败');
+      }
+    } catch (error) {
+      console.error('加载用户数据失败:', error);
+      setClearResults({ error: error.message });
+    } finally {
+      setClearDataLoading(false);
+    }
+  };
+
+  // 获取特定用户的数据统计
+  const getUserDataStats = async (uid: string) => {
+    try {
+      setClearDataLoading(true);
+      await ensureLogin();
+      const app = await getApp();
+      
+      const result = await app.callFunction({
+        name: 'clear-user-data',
+        data: { 
+          action: 'get_user_data_stats',
+          adminKey: 'LEXICON_SUPER_ADMIN_2025',
+          uid
+        }
+      });
+      
+      if (result.result?.success) {
+        setUserDataStats(result.result.stats);
+      } else {
+        throw new Error(result.result?.error || '获取用户统计失败');
+      }
+    } catch (error) {
+      console.error('获取用户统计失败:', error);
+      setClearResults({ error: error.message });
+    } finally {
+      setClearDataLoading(false);
+    }
+  };
+
+  // 清除用户学习记录
+  const clearUserStudyRecords = async (uid: string, wordbookId?: string) => {
+    if (!confirm(`确定要清除用户 ${uid} 的学习记录吗？此操作不可撤销！`)) {
+      return;
+    }
+
+    try {
+      setClearDataLoading(true);
+      await ensureLogin();
+      const app = await getApp();
+      
+      const result = await app.callFunction({
+        name: 'clear-user-data',
+        data: { 
+          action: 'clear_user_study_records',
+          adminKey: 'LEXICON_SUPER_ADMIN_2025',
+          uid,
+          wordbookId
+        }
+      });
+      
+      if (result.result?.success) {
+        setClearResults(result.result);
+        // 刷新数据
+        await loadAllUsersData();
+        if (selectedUserId === uid) {
+          await getUserDataStats(uid);
+        }
+      } else {
+        throw new Error(result.result?.error || '清除学习记录失败');
+      }
+    } catch (error) {
+      console.error('清除学习记录失败:', error);
+      setClearResults({ error: error.message });
+    } finally {
+      setClearDataLoading(false);
+    }
+  };
+
+  // 清除用户每日计划
+  const clearUserDailyPlans = async (uid: string) => {
+    if (!confirm(`确定要清除用户 ${uid} 的每日计划吗？此操作不可撤销！`)) {
+      return;
+    }
+
+    try {
+      setClearDataLoading(true);
+      await ensureLogin();
+      const app = await getApp();
+      
+      const result = await app.callFunction({
+        name: 'clear-user-data',
+        data: { 
+          action: 'clear_user_daily_plans',
+          adminKey: 'LEXICON_SUPER_ADMIN_2025',
+          uid
+        }
+      });
+      
+      if (result.result?.success) {
+        setClearResults(result.result);
+        // 刷新数据
+        await loadAllUsersData();
+        if (selectedUserId === uid) {
+          await getUserDataStats(uid);
+        }
+      } else {
+        throw new Error(result.result?.error || '清除每日计划失败');
+      }
+    } catch (error) {
+      console.error('清除每日计划失败:', error);
+      setClearResults({ error: error.message });
+    } finally {
+      setClearDataLoading(false);
+    }
+  };
+
+  // 清除用户所有数据
+  const clearAllUserData = async (uid: string) => {
+    const confirmText = prompt(`⚠️ 危险操作！\n\n这将删除用户 ${uid} 的所有数据，包括：\n- 学习记录\n- 每日计划\n- 用户设置\n\n请输入 "YES_DELETE_ALL_DATA" 确认操作：`);
+    
+    if (confirmText !== 'YES_DELETE_ALL_DATA') {
+      alert('操作已取消');
+      return;
+    }
+
+    try {
+      setClearDataLoading(true);
+      await ensureLogin();
+      const app = await getApp();
+      
+      const result = await app.callFunction({
+        name: 'clear-user-data',
+        data: { 
+          action: 'clear_all_user_data',
+          adminKey: 'LEXICON_SUPER_ADMIN_2025',
+          uid,
+          confirm: 'YES_DELETE_ALL_DATA'
+        }
+      });
+      
+      if (result.result?.success) {
+        setClearResults(result.result);
+        // 刷新数据
+        await loadAllUsersData();
+        setSelectedUserId('');
+        setUserDataStats(null);
+      } else {
+        throw new Error(result.result?.error || '清除所有数据失败');
+      }
+    } catch (error) {
+      console.error('清除所有数据失败:', error);
+      setClearResults({ error: error.message });
+    } finally {
+      setClearDataLoading(false);
     }
   };
 
@@ -367,6 +556,7 @@ const AdminPage: React.FC = () => {
       ...(isSuperAdmin ? [
         { id: 'users', name: '用户管理', icon: Users },
         { id: 'keys', name: '密钥管理', icon: Key },
+        { id: 'data-management', name: '数据管理', icon: Trash2 },
         { id: 'migration', name: '数据迁移', icon: Database }
       ] : [])
     ];
@@ -782,6 +972,232 @@ const AdminPage: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* 数据管理页面 */}
+          {activeTab === 'data-management' && (
+            <div className="space-y-6">
+              <div className="bg-gray-800 rounded-xl p-6 border border-gray-700/50">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-white">用户数据管理</h2>
+                    <p className="text-gray-400 mt-1">开发测试专用：清除用户学习记录和记忆数据</p>
+                  </div>
+                  <Button
+                    onClick={loadAllUsersData}
+                    disabled={clearDataLoading}
+                    className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white"
+                  >
+                    {clearDataLoading ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    刷新数据
+                  </Button>
+                </div>
+
+                {/* 危险操作警告 */}
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6">
+                  <div className="flex items-start space-x-2">
+                    <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-red-300">
+                      <p className="font-medium">⚠️ 危险操作区域</p>
+                      <p className="mt-1">此功能仅限开发测试使用，所有清除操作不可撤销！请谨慎操作！</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 用户列表 */}
+                {clearDataLoading && !allUsersData.length ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-gray-400">正在加载用户数据...</p>
+                    </div>
+                  </div>
+                ) : allUsersData.length === 0 ? (
+                  <div className="text-center py-12">
+                    <UserMinus className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-white mb-2">暂无用户数据</h3>
+                    <p className="text-gray-400">没有找到任何用户的学习数据</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 用户列表 */}
+                    <div className="bg-gray-700/50 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-white mb-4">用户列表</h3>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {allUsersData.map((userData, index) => (
+                          <div 
+                            key={userData.uid}
+                            className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                              selectedUserId === userData.uid
+                                ? 'bg-purple-500/20 border-purple-500/30'
+                                : 'bg-gray-800/50 border-gray-600/50 hover:border-gray-500/50'
+                            }`}
+                            onClick={() => {
+                              setSelectedUserId(userData.uid);
+                              getUserDataStats(userData.uid);
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-white font-medium font-mono text-sm">
+                                  {userData.uid ? userData.uid.slice(0, 12) + '...' : '未知用户'}
+                                </p>
+                                <div className="flex space-x-4 text-xs text-gray-400 mt-1">
+                                  <span>学习记录: {userData.studyRecords || 0}</span>
+                                  <span>每日计划: {userData.dailyPlans || 0}</span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm text-purple-300">
+                                  {(userData.studyRecords || 0) + (userData.dailyPlans || 0) + (userData.userSettings || 0)} 条
+                                </div>
+                                <div className="text-xs text-gray-400">总数据</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 选中用户的详细信息和操作 */}
+                    <div className="bg-gray-700/50 rounded-lg p-4">
+                      {selectedUserId ? (
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-white">用户数据详情</h3>
+                            <Button
+                              onClick={() => getUserDataStats(selectedUserId)}
+                              disabled={clearDataLoading}
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                            >
+                              刷新
+                            </Button>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="p-3 bg-gray-800/50 rounded-lg">
+                              <p className="text-gray-300 text-sm mb-2">用户ID</p>
+                              <p className="text-white font-mono text-sm break-all">{selectedUserId}</p>
+                            </div>
+
+                            {userDataStats ? (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="p-3 bg-gray-800/50 rounded-lg text-center">
+                                  <div className="text-xl font-semibold text-blue-400">
+                                    {userDataStats.studyRecords || 0}
+                                  </div>
+                                  <div className="text-xs text-gray-400">学习记录</div>
+                                </div>
+                                <div className="p-3 bg-gray-800/50 rounded-lg text-center">
+                                  <div className="text-xl font-semibold text-green-400">
+                                    {userDataStats.dailyPlans || 0}
+                                  </div>
+                                  <div className="text-xs text-gray-400">每日计划</div>
+                                </div>
+                                <div className="p-3 bg-gray-800/50 rounded-lg text-center">
+                                  <div className="text-xl font-semibold text-purple-400">
+                                    {userDataStats.userSettings || 0}
+                                  </div>
+                                  <div className="text-xs text-gray-400">用户设置</div>
+                                </div>
+                                <div className="p-3 bg-gray-800/50 rounded-lg text-center">
+                                  <div className="text-xl font-semibold text-orange-400">
+                                    {(userDataStats.studyRecords || 0) + (userDataStats.dailyPlans || 0) + (userDataStats.userSettings || 0)}
+                                  </div>
+                                  <div className="text-xs text-gray-400">总计</div>
+                                </div>
+                              </div>
+                            ) : clearDataLoading ? (
+                              <div className="flex items-center justify-center py-8">
+                                <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+                              </div>
+                            ) : null}
+
+                            {userDataStats && userDataStats.lastStudyTime && (
+                              <div className="p-3 bg-gray-800/50 rounded-lg">
+                                <p className="text-gray-300 text-sm mb-1">最后学习时间</p>
+                                <p className="text-white text-sm">
+                                  {new Date(userDataStats.lastStudyTime).toLocaleString('zh-CN')}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* 操作按钮 */}
+                            {userDataStats && (
+                              <div className="space-y-3 pt-4 border-t border-gray-600/50">
+                                <Button
+                                  onClick={() => clearUserStudyRecords(selectedUserId)}
+                                  disabled={clearDataLoading}
+                                  className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  清除学习记录
+                                </Button>
+                                
+                                <Button
+                                  onClick={() => clearUserDailyPlans(selectedUserId)}
+                                  disabled={clearDataLoading}
+                                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white"
+                                >
+                                  <Calendar className="w-4 h-4 mr-2" />
+                                  清除每日计划
+                                </Button>
+                                
+                                <Button
+                                  onClick={() => clearAllUserData(selectedUserId)}
+                                  disabled={clearDataLoading}
+                                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  <UserMinus className="w-4 h-4 mr-2" />
+                                  清除所有数据
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                          <p className="text-gray-400">请选择一个用户查看详情</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 操作结果显示 */}
+                {clearResults && (
+                  <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
+                    <h4 className="text-white font-medium mb-3">操作结果</h4>
+                    {clearResults.error ? (
+                      <div className="text-red-400">
+                        错误: {clearResults.error}
+                      </div>
+                    ) : (
+                      <div className="text-green-400">
+                        <div>{clearResults.message}</div>
+                        {clearResults.deletedCount && (
+                          <div className="text-sm mt-1">
+                            删除了 {clearResults.deletedCount} 条记录
+                          </div>
+                        )}
+                        {clearResults.details && (
+                          <pre className="mt-2 text-xs text-gray-300 bg-gray-800 p-2 rounded overflow-auto max-h-40">
+                            {JSON.stringify(clearResults.details, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -115,6 +115,22 @@
       "entry": "index.js",
       "runtime": "Nodejs18.15",
       "installDependency": true
+    },
+    {
+      "name": "clear-user-data",
+      "description": "清除用户数据云函数 - 开发测试专用：清除指定用户的所有学习记录和记忆数据",
+      "source": "cloudfunctions/clear-user-data",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true
+    },
+    {
+      "name": "userInfo",
+      "description": "用户信息服务 - 提供用户认证和基本信息管理功能",
+      "source": "cloudfunctions/userInfo",
+      "entry": "index.js",
+      "runtime": "Nodejs18.15",
+      "installDependency": true
     }
   ],
   "hosting": {
