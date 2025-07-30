@@ -8,7 +8,7 @@
 
 **生产环境**: [https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com](https://cloud1-7g7oatv381500c81-1367168150.tcloudbaseapp.com)
 
-> 📅 最后部署: 2025-07-25  
+> 📅 最后部署: 2025-07-30  
 > ✅ 状态: 正常运行  
 > 🔧 版本: v2.0.0  
 > 🎯 环境: cloud1-7g7oatv381500c81
@@ -190,7 +190,7 @@ lexicon-webapp/
 
 ### 1. 克隆项目
 ```bash
-git clone <repository-url>
+git clone https://github.com/syh52/lexicon-webapp.git
 cd lexicon-webapp
 ```
 
@@ -387,9 +387,9 @@ npm run test
 - 预期行为说明
 
 ### 联系方式
-- **项目仓库**: [GitHub Issues](your-repo-issues-url)
-- **技术文档**: [项目Wiki](your-wiki-url)
-- **更新日志**: [CHANGELOG.md](./CHANGELOG.md)
+- **项目仓库**: [GitHub Issues](https://github.com/syh52/lexicon-webapp/issues)
+- **技术文档**: [项目Wiki](https://github.com/syh52/lexicon-webapp/wiki)
+- **更新日志**: [GitHub Releases](https://github.com/syh52/lexicon-webapp/releases)
 
 ## 📄 许可证
 
